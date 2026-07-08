@@ -12,10 +12,20 @@ const NOTIF_CONFIG = {
   started:    { icon: '🚀', bg: 'bg-violet-50 border-violet-100', label: 'Started' },
 }
 
+// Requirement 3: color-code by status — 🟢 Completed, 🟡 In Progress, 🔴 Overdue.
+// Notification "type" maps directly onto these three buckets (reminder/
+// assignment/started are all still in-flight work, so they read as 🟡).
+function statusDot(type) {
+  if (type === 'completed') return '🟢'
+  if (type === 'overdue') return '🔴'
+  return '🟡'
+}
+
 export default function NotificationsPage() {
   const { id } = useParams()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedUser, setExpandedUser] = useState(null)
 
   useEffect(() => {
     api.get(`/projects/${id}/notifications`).then(r => setItems(r.data)).finally(() => setLoading(false))
@@ -36,6 +46,21 @@ export default function NotificationsPage() {
       </div>
     </div>
   )
+
+  // Requirement 7(b): group by assigned person and show only a COUNT per
+  // user by default — full message text is revealed only after clicking
+  // into that user's group.
+  const groups = {}
+  for (const n of items) {
+    const key = n.user_name || 'Unassigned'
+    if (!groups[key]) groups[key] = []
+    groups[key].push(n)
+  }
+  const groupNames = Object.keys(groups).sort((a, b) => {
+    if (a === 'Unassigned') return 1
+    if (b === 'Unassigned') return -1
+    return groups[b].length - groups[a].length
+  })
 
   return (
     <div className="max-w-2xl animate-fade-up">
@@ -65,33 +90,69 @@ export default function NotificationsPage() {
         </div>
       ) : (
         <div className="space-y-2 stagger">
-          {items.map(n => {
-            const cfg = NOTIF_CONFIG[n.type] || { icon: '📣', bg: 'bg-gray-50 border-gray-100', label: 'Info' }
+          {groupNames.map(name => {
+            const group = groups[name]
+            const groupUnread = group.filter(n => !n.read).length
+            const isOpen = expandedUser === name
             return (
-              <div key={n.id}
-                className={clsx('flex items-start gap-3 p-4 rounded-2xl border transition-all duration-200 animate-fade-up',
-                  cfg.bg, !n.read && 'ring-2 ring-violet-100 shadow-sm')}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-white shadow-sm">
-                  {cfg.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{cfg.label}</span>
-                    {!n.read && <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />}
-                  </div>
-                  <div className="text-sm text-gray-800 leading-snug mb-1">{n.message}</div>
-                  <div className="text-xs text-gray-400">{fmtDateTime(n.created_at)}</div>
-                  {n.email_sent && (
-                    <div className="text-xs text-emerald-600 mt-1">
-                      ✉️ Email sent to {n.email_to}
+              <div key={name} className="rounded-2xl border border-gray-100 overflow-hidden bg-white animate-fade-up">
+                <button
+                  onClick={() => setExpandedUser(isOpen ? null : name)}
+                  className="w-full flex items-center justify-between gap-3 p-4 hover:bg-gray-50 transition-colors text-left">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 bg-violet-50 text-violet-600">
+                      {name === 'Unassigned' ? '?' : name.slice(0,1).toUpperCase()}
                     </div>
-                  )}
-                </div>
-                {!n.read && (
-                  <button onClick={() => markRead(n.id)}
-                    className="btn text-xs py-1 px-2.5 flex-shrink-0 hover:bg-violet-50 hover:text-violet-600 hover:border-violet-200">
-                    ✓ Mark read
-                  </button>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-800 truncate">{name}</div>
+                      <div className="text-xs text-gray-400">
+                        {group.length} notification{group.length!==1?'s':''}{groupUnread>0 && ` · ${groupUnread} unread`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs font-bold bg-violet-100 text-violet-700 rounded-full w-7 h-7 flex items-center justify-center">
+                      {group.length}
+                    </span>
+                    <span className="text-gray-300 text-xs">{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-gray-50 p-3 space-y-2 bg-gray-50/40">
+                    {group.map(n => {
+                      const cfg = NOTIF_CONFIG[n.type] || { icon: '📣', bg: 'bg-gray-50 border-gray-100', label: 'Info' }
+                      return (
+                        <div key={n.id}
+                          className={clsx('flex items-start gap-3 p-3 rounded-xl border transition-all duration-200',
+                            cfg.bg, !n.read && 'ring-2 ring-violet-100 shadow-sm')}>
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0 bg-white shadow-sm">
+                            {cfg.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span>{statusDot(n.type)}</span>
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{cfg.label}</span>
+                              {!n.read && <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />}
+                            </div>
+                            <div className="text-sm text-gray-800 leading-snug mb-1">{n.message}</div>
+                            <div className="text-xs text-gray-400">{fmtDateTime(n.created_at)}</div>
+                            {n.email_sent && (
+                              <div className="text-xs text-emerald-600 mt-1">
+                                ✉️ Email sent to {n.email_to}
+                              </div>
+                            )}
+                          </div>
+                          {!n.read && (
+                            <button onClick={() => markRead(n.id)}
+                              className="btn text-xs py-1 px-2.5 flex-shrink-0 hover:bg-violet-50 hover:text-violet-600 hover:border-violet-200">
+                              ✓ Mark read
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             )

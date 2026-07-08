@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { fmtDate, fmtDateTime, daysLeft } from '../../utils/helpers'
+import { fmtDate, fmtDateTime, daysLeft, fmtHours } from '../../utils/helpers'
 import { DashboardSkeleton } from '../../components/common/SkeletonLoader'
 import api from '../../utils/api'
 import clsx from 'clsx'
@@ -41,6 +41,7 @@ export default function AdminDashboard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
+  const [whSummary, setWhSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -50,9 +51,11 @@ export default function AdminDashboard() {
     Promise.all([
       api.get(`/projects/${id}/dashboard`),
       api.get(`/projects/${id}/assignments/summary`).catch(() => ({ data: null })),
+      api.get(`/work-hours/summary?project_id=${id}`).catch(() => ({ data: null })),
     ])
-      .then(([dashRes, assignRes]) => {
+      .then(([dashRes, assignRes, whRes]) => {
         setData({ ...dashRes.data, assignmentSummary: assignRes.data })
+        setWhSummary(whRes.data)
       })
       .catch(err => {
         console.error('Dashboard error:', err)
@@ -105,7 +108,7 @@ export default function AdminDashboard() {
 
       {/* Metric cards */}
       <div className="grid grid-cols-5 gap-3 stagger">
-        <MetricCard icon="🏁" label="Total Milestones" value={summary.total} sub="10 phases" gradient="from-violet-100 to-purple-100" delay={0} />
+        <MetricCard icon="🏁" label="Total Milestones" value={summary.total} sub={`${summary.total} selected`} gradient="from-violet-100 to-purple-100" delay={0} />
         <MetricCard icon="✅" label="Completed" value={summary.completed} sub="on schedule" gradient="from-emerald-100 to-teal-100" delay={50} />
         <MetricCard icon="⚡" label="In Progress" value={summary.in_progress} sub="active now" gradient="from-amber-100 to-orange-100" delay={100} />
         <MetricCard icon="🔥" label="Overdue" value={summary.overdue} sub="needs action" gradient="from-rose-100 to-pink-100" delay={150} />
@@ -149,13 +152,13 @@ export default function AdminDashboard() {
               <span className="text-lg">🏁</span>
               <span className="text-sm font-semibold text-gray-800">Milestone Tracker</span>
             </div>
-            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">10 phases</span>
+            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">{milestones.length} milestone{milestones.length === 1 ? '' : 's'}</span>
           </div>
           <div className="space-y-2">
             {milestones.map((ms, i) => (
               <div key={ms.num} onClick={() => navigate(`/projects/${id}/milestone/${ms.num}`)}
                 className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-violet-50 cursor-pointer transition-all group">
-                <span className="text-base">{MS_ICONS[i]}</span>
+                <span className="text-base">{MS_ICONS[i % MS_ICONS.length]}</span>
                 <span className="text-xs text-gray-700 flex-1 truncate group-hover:text-violet-700 font-medium">
                   {String(ms.num).padStart(2,'0')} {ms.name}
                 </span>
@@ -175,7 +178,9 @@ export default function AdminDashboard() {
         {/* Right column */}
         <div className="space-y-4">
 
-          {/* Notifications */}
+          {/* Notifications — Req 2: count only per user, click to view detail,
+              unread shown with a highlighted indicator. Full messages live on
+              the dedicated Notifications page (grouped, expandable there). */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -188,20 +193,47 @@ export default function AdminDashboard() {
                 </span>
               )}
             </div>
-            <div className="space-y-2">
-              {(notifications || []).slice(0,4).map(n => {
-                const icons = { overdue:'🔥', reminder:'⏰', completed:'🎉', assignment:'📌', started:'🚀' }
-                const bgs = { overdue:'bg-rose-50 border-rose-100', reminder:'bg-amber-50 border-amber-100', completed:'bg-emerald-50 border-emerald-100', assignment:'bg-blue-50 border-blue-100' }
-                return (
-                  <div key={n.id} className={clsx('flex items-start gap-2 p-2.5 rounded-xl border', bgs[n.type] || 'bg-gray-50 border-gray-100')}>
-                    <span className="text-base flex-shrink-0">{icons[n.type] || '📣'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-gray-700 leading-snug">{n.message}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(n.created_at)}</div>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="space-y-1.5">
+              {(() => {
+                const groups = {}
+                for (const n of (notifications || [])) {
+                  const key = n.user_name || 'General'
+                  if (!groups[key]) groups[key] = []
+                  groups[key].push(n)
+                }
+                const names = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length)
+                return names.map(name => {
+                  const group = groups[name]
+                  const unreadCount = group.filter(n => !n.read).length
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => navigate(`/projects/${id}/notifications`)}
+                      className={clsx(
+                        'w-full flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-colors hover:bg-violet-50/40',
+                        unreadCount > 0 ? 'bg-violet-50/50 border-violet-100' : 'bg-gray-50 border-gray-100'
+                      )}
+                    >
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold flex-shrink-0 bg-white shadow-sm text-violet-600">
+                        {name === 'General' ? '🔔' : name.slice(0,1).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-gray-700 truncate flex items-center gap-1.5">
+                          {name}
+                          {unreadCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />}
+                        </div>
+                        <div className="text-xs text-gray-400">{group.length} notification{group.length!==1?'s':''}</div>
+                      </div>
+                      <span className={clsx(
+                        'text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0',
+                        unreadCount > 0 ? 'bg-rose-100 text-rose-600' : 'bg-violet-100 text-violet-700'
+                      )}>
+                        {group.length}
+                      </span>
+                    </button>
+                  )
+                })
+              })()}
               {(!notifications || notifications.length === 0) && (
                 <div className="text-center py-4 text-gray-400">
                   <div className="text-2xl mb-1">🎉</div>
@@ -247,7 +279,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Bottom row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className={clsx('grid gap-4', whSummary ? 'grid-cols-4' : 'grid-cols-3')}>
 
         {/* Workload */}
         <div className="card">
@@ -266,12 +298,12 @@ export default function AdminDashboard() {
                   <div className="text-xs font-medium text-gray-700 truncate">{w.name}</div>
                   <div className="text-xs text-gray-400 truncate">{w.role}</div>
                 </div>
-                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={clsx('h-1.5 rounded-full',
-                    w.tasks > 8 ? 'bg-rose-400' : w.tasks > 5 ? 'bg-amber-400' : 'bg-emerald-400')}
-                    style={{ width: `${Math.min(w.tasks * 10, 100)}%` }} />
-                </div>
-                <span className="text-xs text-gray-400 w-12 text-right">{w.tasks} tasks</span>
+                <span className="text-xs font-medium text-violet-600 w-14 text-right" title="Milestone-based tasks">
+                  🏁 {w.milestone_tasks?.total ?? 0}
+                </span>
+                <span className="text-xs font-medium text-amber-600 w-12 text-right" title="General tasks">
+                  ⭐ {w.general_tasks?.total ?? 0}
+                </span>
               </div>
             ))}
             {(!workload || workload.length === 0) && (
@@ -334,6 +366,45 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Working Hours & Buffer Time */}
+        {whSummary && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⏱️</span>
+                <span className="text-sm font-semibold text-gray-800">Working Hours</span>
+              </div>
+              <button onClick={() => navigate(`/projects/${id}/working-hours`)}
+                className="text-xs text-violet-500 hover:text-violet-700 font-medium">View all →</button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 mb-3">
+              <div className="bg-cyan-50 rounded-lg p-2 text-center">
+                <div className="text-sm font-bold text-gray-900">{fmtHours(whSummary.total_hours)}h</div>
+                <div className="text-xs text-gray-400">Logged</div>
+              </div>
+              <div className="bg-rose-50 rounded-lg p-2 text-center">
+                <div className="text-sm font-bold text-gray-900">{fmtHours(whSummary.total_buffer_hours)}h</div>
+                <div className="text-xs text-gray-400">Buffer</div>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                <div className="text-sm font-bold text-gray-900">{fmtHours(whSummary.total_actual_working_hours)}h</div>
+                <div className="text-xs text-gray-400">Actual</div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {(whSummary.by_employee || []).slice(0,5).map(e => (
+                <div key={e.name} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600 truncate">{e.name}</span>
+                  <span className="font-medium text-emerald-600">{fmtHours(e.actual_working_hours)}h</span>
+                </div>
+              ))}
+              {(!whSummary.by_employee || whSummary.by_employee.length === 0) && (
+                <div className="text-center py-2 text-gray-400 text-xs">No hours logged yet</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

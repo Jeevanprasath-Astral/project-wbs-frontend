@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import clsx from 'clsx'
+import { useAppStore } from '../../store'
+import { ALL_ROLES, isTeamManager } from '../../utils/permissions'
 
-const ROLES = ['Admin', 'Functional Consultant', 'Technical Team', 'Client']
+const ROLES = ALL_ROLES
 
 const ROLE_COLORS = {
   'Admin':                 'bg-primary-50 text-primary-800',
+  'FC Lead':               'bg-indigo-50 text-indigo-700',
+  'TC Lead':               'bg-teal-50 text-teal-700',
   'Functional Consultant': 'bg-purple-50 text-purple-700',
   'Technical Team':        'bg-success-50 text-success-600',
+  'HR':                    'bg-pink-50 text-pink-700',
   'Client':                'bg-warning-50 text-warning-600',
 }
 
@@ -27,6 +32,8 @@ function Avatar({ name, size = 'md' }) {
 
 export default function TeamPage() {
   const { id } = useParams()
+  const currentUser = useAppStore(s => s.user)
+  const canManage = isTeamManager(currentUser)
   const [team, setTeam] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -116,9 +123,11 @@ export default function TeamPage() {
           <h1 className="text-base font-medium text-gray-900">Team management</h1>
           <p className="text-xs text-gray-400 mt-0.5">{team.length} member{team.length !== 1 ? 's' : ''} in this project</p>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="btn btn-primary text-xs">
-          <i className="ti ti-user-plus text-sm" /> Add member
-        </button>
+        {canManage && (
+          <button onClick={() => setShowAddModal(true)} className="btn btn-primary text-xs">
+            <i className="ti ti-user-plus text-sm" /> Add member
+          </button>
+        )}
       </div>
 
       {/* Message */}
@@ -136,9 +145,11 @@ export default function TeamPage() {
           <div className="card text-center py-12 text-gray-400">
             <i className="ti ti-users text-4xl" />
             <p className="mt-2 text-sm">No team members yet</p>
-            <button onClick={() => setShowAddModal(true)} className="btn btn-primary mt-3 text-xs">
-              <i className="ti ti-user-plus text-sm" /> Add first member
-            </button>
+            {canManage && (
+              <button onClick={() => setShowAddModal(true)} className="btn btn-primary mt-3 text-xs">
+                <i className="ti ti-user-plus text-sm" /> Add first member
+              </button>
+            )}
           </div>
         ) : (
           team.map((m) => (
@@ -155,13 +166,15 @@ export default function TeamPage() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-xs text-gray-400">{m.task_count} tasks</span>
-                <button
-                  onClick={() => handleRemove(m.member_id, m.name)}
-                  className="btn text-xs text-danger-600 border-danger-200 hover:bg-danger-50 py-1 px-2"
-                  title="Remove from project"
-                >
-                  <i className="ti ti-user-minus text-sm" /> Remove
-                </button>
+                {canManage && (
+                  <button
+                    onClick={() => handleRemove(m.member_id, m.name)}
+                    className="btn text-xs text-danger-600 border-danger-200 hover:bg-danger-50 py-1 px-2"
+                    title="Remove from project"
+                  >
+                    <i className="ti ti-user-minus text-sm" /> Remove
+                  </button>
+                )}
               </div>
             </div>
           ))

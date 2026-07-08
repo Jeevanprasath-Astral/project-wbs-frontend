@@ -22,11 +22,6 @@ function ResponseInput({ q, value, onChange }) {
   if (q.input_type?.startsWith('dropdown_')) {
     const opts = {
       dropdown_hml: ['High','Medium','Low'],
-      dropdown_freq: ['Daily','Weekly','Monthly','Quarterly','Ad-hoc'],
-      dropdown_pf: ['Pass','Fail','Partial','N/A'],
-      dropdown_mode: ['Online','Onsite','Hybrid'],
-      dropdown_fmt: ['Excel','PDF','Dashboard','CSV'],
-      dropdown_rev: ['Draft','Under Review','Approved','Rejected'],
       dropdown_sev: ['Critical','High','Medium','Low'],
       dropdown_test: ['Pass','Fail','Blocked','Not Tested'],
       dropdown_closure: ['Open','Closed','Deferred'],
@@ -59,20 +54,20 @@ function ResponseInput({ q, value, onChange }) {
 
 function QuestionRow({ q, idx, response, onSave }) {
   const [val, setVal] = useState(response?.value || '')
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const dirty = val !== (response?.value || '')
 
-  const save = useCallback(async (v) => {
+  // Req 3: no autosave — typing only updates local state. The user must
+  // click Save before the response is persisted to the server.
+  const handleSave = async () => {
+    setSaving(true)
     try {
-      await onSave(q.id, v)
+      await onSave(q.id, val)
       setSaved(true)
       setTimeout(() => setSaved(false), 1500)
-    } catch {}
-  }, [q.id, onSave])
-
-  useEffect(() => {
-    const t = setTimeout(() => { if (val !== (response?.value||'')) save(val) }, 800)
-    return () => clearTimeout(t)
-  }, [val])
+    } catch {} finally { setSaving(false) }
+  }
 
   return (
     <div className={clsx('flex items-start gap-3 py-2 px-3 rounded-lg', idx%2===0 ? 'bg-gray-50' : 'bg-white')}>
@@ -81,6 +76,10 @@ function QuestionRow({ q, idx, response, onSave }) {
         <div className="text-xs font-medium text-gray-700 mb-1">{q.question_text}</div>
         <div className="flex items-start gap-2 flex-wrap">
           <ResponseInput q={q} value={val} onChange={setVal} />
+          <button onClick={handleSave} disabled={!dirty || saving}
+            className={clsx('btn text-xs py-1 px-2 flex-shrink-0', dirty && !saving ? 'btn-primary' : 'opacity-40 cursor-not-allowed')}>
+            {saving ? '⟳' : '💾 Save'}
+          </button>
           {saved && <span className="text-xs text-success-600 pt-1.5 flex-shrink-0">✓ Saved</span>}
         </div>
       </div>
@@ -91,14 +90,25 @@ function QuestionRow({ q, idx, response, onSave }) {
 function SubtaskBlock({ subtask, projectId, onSignOff }) {
   const [open, setOpen] = useState(false)
   const [responses, setResponses] = useState(subtask.responses || {})
+  // Req 3: buffered local value for the no-questions direct-response case —
+  // saved only when the user clicks Save, not on every keystroke.
+  const [directVal, setDirectVal] = useState(subtask.response || '')
+  const [directSaving, setDirectSaving] = useState(false)
+  const [directSaved, setDirectSaved] = useState(false)
+  const directDirty = directVal !== (subtask.response || '')
 
   const saveResponse = async (questionId, value) => {
     await api.post(`/projects/${projectId}/responses`, { question_id: questionId, value })
     setResponses(r => ({ ...r, [questionId]: { value } }))
   }
 
-  const saveDirectResponse = async (value) => {
-    await api.post(`/projects/${projectId}/responses`, { subtask_id: subtask.id, value })
+  const saveDirectResponse = async () => {
+    setDirectSaving(true)
+    try {
+      await api.post(`/projects/${projectId}/responses`, { subtask_id: subtask.id, value: directVal })
+      setDirectSaved(true)
+      setTimeout(() => setDirectSaved(false), 1500)
+    } finally { setDirectSaving(false) }
   }
 
   const answeredCount = subtask.questions?.length
@@ -151,13 +161,18 @@ function SubtaskBlock({ subtask, projectId, onSignOff }) {
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 bg-white">
+            <div className="flex items-center gap-2 flex-wrap px-4 py-3 bg-white">
               <span className="text-xs font-medium text-gray-700 flex-1">{subtask.name}</span>
               <ResponseInput
                 q={{ input_type: subtask.input_type || 'text' }}
-                value={subtask.response || ''}
-                onChange={saveDirectResponse}
+                value={directVal}
+                onChange={setDirectVal}
               />
+              <button onClick={saveDirectResponse} disabled={!directDirty || directSaving}
+                className={clsx('btn text-xs py-1 px-2 flex-shrink-0', directDirty && !directSaving ? 'btn-primary' : 'opacity-40 cursor-not-allowed')}>
+                {directSaving ? '⟳' : '💾 Save'}
+              </button>
+              {directSaved && <span className="text-xs text-success-600 flex-shrink-0">✓ Saved</span>}
             </div>
           )}
 
@@ -307,7 +322,7 @@ export default function MilestonePage() {
             <div className="text-xs text-gray-400">{done}/{total} subtasks done</div>
           </div>
           <div className="w-28 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-2.5 rounded-full transition-all" style={{background:'linear-gradient(90deg,#7c3aed,#4f46e5)'}} style={{ width: `${pct}%` }} />
+            <div className="h-2.5 rounded-full transition-all" style={{ background: 'linear-gradient(90deg,#7c3aed,#4f46e5)', width: `${pct}%` }} />
           </div>
         </div>
       </div>

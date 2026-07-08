@@ -1,7 +1,11 @@
 import axios from 'axios'
 
+// Local dev (vite dev, via START_PROJECT_WBS.bat) proxies /api -> http://localhost:8000
+// (see vite.config.js). Production builds fall back to the deployed Render backend
+// unless VITE_API_URL is explicitly set.
 const api = axios.create({
-  baseURL: 'https://project-wbs-backend.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL
+    || (import.meta.env.DEV ? '/api' : 'https://project-wbs-backend.onrender.com/api'),
   headers: { 'Content-Type': 'application/json' },
 })
 

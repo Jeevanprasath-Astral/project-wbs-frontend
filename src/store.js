@@ -25,6 +25,12 @@ export const useAppStore = create(
       // Sidebar collapsed
       sidebarOpen: true,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+      // Bumped whenever a project's selected milestones change (add/remove/reset),
+      // so the AppLayout sidebar (which fetches independently) knows to refetch
+      // even when the user hasn't navigated away from the configure page.
+      milestonesVersion: 0,
+      bumpMilestonesVersion: () => set((s) => ({ milestonesVersion: s.milestonesVersion + 1 })),
     }),
     { name: 'wbs-store', partialize: (s) => ({ user: s.user, token: s.token, activeProject: s.activeProject }) }
   )
