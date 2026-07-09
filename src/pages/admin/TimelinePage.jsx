@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { fmtDate } from '../../utils/helpers'
 import api from '../../utils/api'
 import clsx from 'clsx'
+import { dateRangeError } from '../../utils/dateRange'
 
 const MS_ICONS = ['🚀','🤝','🔍','📝','⚙️','🧪','📦','✅','🌟','🛡️']
 const STATUS_CFG = {
@@ -58,6 +59,10 @@ export default function TimelinePage() {
   const save = async (ms) => {
     const e = edits[ms.id]
     if (!e) return
+    const startVal = e.planned_start !== undefined ? e.planned_start : (ms.planned_start?.split('T')[0] || '')
+    const endVal   = e.planned_end   !== undefined ? e.planned_end   : (ms.planned_end?.split('T')[0]   || '')
+    const drErr = dateRangeError(startVal, endVal)
+    if (drErr) { alert(drErr); return }
     setSaving(ms.id)
     try {
       await api.patch(`/projects/${id}/milestones/${ms.id}`, {
@@ -130,10 +135,20 @@ export default function TimelinePage() {
               <div className="text-xs text-gray-500 truncate pr-2">{ms.assignee || '—'}</div>
               <input type="date" className="input text-xs h-8 px-2"
                 value={startVal}
-                onChange={e => setField(ms.id, 'planned_start', e.target.value)} />
+                onChange={e => {
+                  const v = e.target.value
+                  const shouldClear = v && endVal && v > endVal
+                  setField(ms.id, 'planned_start', v)
+                  if (shouldClear) setField(ms.id, 'planned_end', '')
+                }} />
               <input type="date" className="input text-xs h-8 px-2"
                 value={endVal}
-                onChange={e => setField(ms.id, 'planned_end', e.target.value)} />
+                min={startVal || undefined}
+                onChange={e => {
+                  const v = e.target.value
+                  if (startVal && v && v < startVal) return
+                  setField(ms.id, 'planned_end', v)
+                }} />
               <div className="text-xs text-gray-400">{fmtDate(ms.actual_start) || '—'}</div>
               <span className={sc.cls}>{sc.icon} {ms.status}</span>
               <button onClick={() => save(ms)} disabled={!dirty || saving === ms.id}

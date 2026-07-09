@@ -6,6 +6,7 @@ import { getProjectTeam, getProjectCustomMilestones } from '../../utils/masterDa
 import { useAppStore } from '../../store'
 import { isElevated } from '../../utils/permissions'
 import clsx from 'clsx'
+import { dateRangeError } from '../../utils/dateRange'
 
 const PRIORITY_CONFIG = {
   'High':   { cls: 'bg-rose-50 text-rose-700 border-rose-100',   icon: '🔴' },
@@ -229,6 +230,10 @@ export default function AssignmentsPage() {
     // we surface a real, visible error so a missing field is obvious.
     if (!form.title) { showMsg('Please enter a task title.', 'error'); return }
     if (!form.assigned_to) { showMsg('Please select who to assign this task to.', 'error'); return }
+    if (form.planned_start_date && form.planned_end_date) {
+      const drErr = dateRangeError(form.planned_start_date, form.planned_end_date)
+      if (drErr) { showMsg('Planned ' + drErr, 'error'); return }
+    }
     setSaving(true)
     try {
       // Pull the raw planned_*_date/time scratch fields out of the payload —
@@ -546,7 +551,11 @@ export default function AssignmentsPage() {
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Start date</label>
                     <input type="date" className="input text-xs h-8" value={form.planned_start_date}
-                      onChange={e => setForm({...form, planned_start_date: e.target.value})} />
+                      onChange={e => {
+                        const v = e.target.value
+                        const shouldClear = v && form.planned_end_date && v > form.planned_end_date
+                        setForm({...form, planned_start_date: v, ...(shouldClear ? {planned_end_date:''} : {})})
+                      }} />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Start time</label>
@@ -556,7 +565,12 @@ export default function AssignmentsPage() {
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">End date</label>
                     <input type="date" className="input text-xs h-8" value={form.planned_end_date}
-                      onChange={e => setForm({...form, planned_end_date: e.target.value})} />
+                      min={form.planned_start_date || undefined}
+                      onChange={e => {
+                        const v = e.target.value
+                        if (form.planned_start_date && v && v < form.planned_start_date) return
+                        setForm({...form, planned_end_date: v})
+                      }} />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">End time</label>

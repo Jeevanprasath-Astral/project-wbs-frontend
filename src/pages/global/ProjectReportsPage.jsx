@@ -183,11 +183,18 @@ export default function ProjectReportsPage() {
 
                 <FilterDate label="📅 Start Date (actual start)"
                   value={bFilter.start_date}
-                  onChange={v => setBFilter(f => ({ ...f, start_date: v }))} />
+                  onChange={v => setBFilter(f => ({
+                    ...f, start_date: v,
+                    ...(v && f.end_date && v > f.end_date ? {end_date:''} : {}),
+                  }))} />
 
                 <FilterDate label="📅 End Date (actual end)"
                   value={bFilter.end_date}
-                  onChange={v => setBFilter(f => ({ ...f, end_date: v }))} />
+                  min={bFilter.start_date || undefined}
+                  onChange={v => {
+                    if (bFilter.start_date && v && v < bFilter.start_date) return
+                    setBFilter(f => ({ ...f, end_date: v }))
+                  }} />
 
               </div>
             </div>
@@ -243,11 +250,18 @@ export default function ProjectReportsPage() {
 
                 <FilterDate label="📅 Planned End — From"
                   value={tFilter.start_date}
-                  onChange={v => setTFilter(f => ({ ...f, start_date: v }))} />
+                  onChange={v => setTFilter(f => ({
+                    ...f, start_date: v,
+                    ...(v && f.end_date && v > f.end_date ? {end_date:''} : {}),
+                  }))} />
 
                 <FilterDate label="📅 Planned End — To"
                   value={tFilter.end_date}
-                  onChange={v => setTFilter(f => ({ ...f, end_date: v }))} />
+                  min={tFilter.start_date || undefined}
+                  onChange={v => {
+                    if (tFilter.start_date && v && v < tFilter.start_date) return
+                    setTFilter(f => ({ ...f, end_date: v }))
+                  }} />
 
               </div>
             </div>

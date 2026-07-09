@@ -5,6 +5,7 @@ import { fmtDate } from '../utils/helpers'
 import { canCreateProject } from '../utils/permissions'
 import api from '../utils/api'
 import clsx from 'clsx'
+import { handleStartDate, handleEndDate, dateRangeError } from '../utils/dateRange'
 
 const STATUS_CONFIG = {
   'Completed':   { cls: 'badge-done', icon: '✅' },
@@ -96,6 +97,8 @@ export default function ProjectsPage() {
   }
 
   const handleEditSave = async () => {
+    const drErr = dateRangeError(editForm.start_date, editForm.end_date)
+    if (drErr) { showMsg(drErr, 'error'); return }
     setSavingEdit(true)
     try {
       const res = await api.patch(`/projects/${editProject.id}`, editForm)
@@ -388,12 +391,13 @@ export default function ProjectsPage() {
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Start Date</label>
                   <input type="date" className="input text-sm" value={editForm.start_date}
-                    onChange={e => setEditForm(f => ({...f, start_date: e.target.value}))} />
+                    onChange={e => handleStartDate('start_date', 'end_date', e.target.value, editForm, setEditForm)} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">End Date</label>
                   <input type="date" className="input text-sm" value={editForm.end_date}
-                    onChange={e => setEditForm(f => ({...f, end_date: e.target.value}))} />
+                    min={editForm.start_date || undefined}
+                    onChange={e => handleEndDate('start_date', 'end_date', e.target.value, editForm, setEditForm)} />
                 </div>
               </div>
               <div>

@@ -4,6 +4,7 @@ import { useAppStore } from '../store'
 import api from '../utils/api'
 import { getUsersList, invalidateMasterData } from '../utils/masterData'
 import clsx from 'clsx'
+import { handleStartDate, handleEndDate, dateRangeError } from '../utils/dateRange'
 
 const PROJECT_TYPES = [
   'Data Analytics',
@@ -143,6 +144,8 @@ export default function ProjectSetup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const drErr = dateRangeError(form.start_date, form.end_date)
+    if (drErr) { setError(drErr); return }
     setLoading(true)
     setError('')
     try {
@@ -266,14 +269,19 @@ export default function ProjectSetup() {
                   📅 Start Date <span className="text-rose-500">*</span>
                 </label>
                 <input type="date" className="input text-sm"
-                  value={form.start_date} onChange={e => set('start_date', e.target.value)} required />
+                  value={form.start_date}
+                  onChange={e => handleStartDate('start_date', 'end_date', e.target.value, form, setForm)}
+                  required />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1.5">
                   🏁 Planned End Date <span className="text-rose-500">*</span>
                 </label>
                 <input type="date" className="input text-sm"
-                  value={form.end_date} onChange={e => set('end_date', e.target.value)} required />
+                  value={form.end_date}
+                  min={form.start_date || undefined}
+                  onChange={e => handleEndDate('start_date', 'end_date', e.target.value, form, setForm)}
+                  required />
               </div>
             </div>
 

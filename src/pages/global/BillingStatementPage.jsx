@@ -154,14 +154,22 @@ export default function BillingStatementPage() {
               <label className="block text-xs text-gray-500 mb-1">Start Date</label>
               <input type="date" className="input text-xs h-8"
                 value={filters.start_date}
-                onChange={e => setF('start_date', e.target.value)} />
+                onChange={e => {
+                  const v = e.target.value
+                  setF('start_date', v)
+                  if (v && filters.end_date && v > filters.end_date) setF('end_date', '')
+                }} />
             </div>
 
             <div>
               <label className="block text-xs text-gray-500 mb-1">End Date</label>
               <input type="date" className="input text-xs h-8"
                 value={filters.end_date}
-                onChange={e => setF('end_date', e.target.value)} />
+                min={filters.start_date || undefined}
+                onChange={e => {
+                  if (filters.start_date && e.target.value && e.target.value < filters.start_date) return
+                  setF('end_date', e.target.value)
+                }} />
             </div>
 
           </div>

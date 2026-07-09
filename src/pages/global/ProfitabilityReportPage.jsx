@@ -174,11 +174,19 @@ export default function ProfitabilityReportPage() {
 
               <FilterDate label="📅 Period — From"
                 value={filter.start_date}
-                onChange={v => setFilter(f => ({ ...f, start_date: v }))} />
+                onChange={v => setFilter(f => ({
+                  ...f,
+                  start_date: v,
+                  ...(v && f.end_date && v > f.end_date ? {end_date:''} : {}),
+                }))} />
 
               <FilterDate label="📅 Period — To"
                 value={filter.end_date}
-                onChange={v => setFilter(f => ({ ...f, end_date: v }))} />
+                min={filter.start_date || undefined}
+                onChange={v => {
+                  if (filter.start_date && v && v < filter.start_date) return
+                  setFilter(f => ({ ...f, end_date: v }))
+                }} />
 
             </div>
           </div>

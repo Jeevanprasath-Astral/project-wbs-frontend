@@ -88,12 +88,21 @@ function TimelineFields({ value, onChange, team, showHours, showVarianceReason }
       <div>
         <label className="block text-xs text-gray-400 mb-0.5">Planned start</label>
         <input type="date" className="input text-xs h-7 w-full" value={dfmt(value.planned_start)}
-          onChange={e=>onChange({...value,planned_start:e.target.value})} />
+          onChange={e=>{
+            const v=e.target.value
+            const shouldClear=v&&value.planned_end&&v>value.planned_end
+            onChange({...value,planned_start:v,...(shouldClear?{planned_end:''}:{})})
+          }} />
       </div>
       <div>
         <label className="block text-xs text-gray-400 mb-0.5">Planned end</label>
         <input type="date" className="input text-xs h-7 w-full" value={dfmt(value.planned_end)}
-          onChange={e=>onChange({...value,planned_end:e.target.value})} />
+          min={value.planned_start||undefined}
+          onChange={e=>{
+            const v=e.target.value
+            if(value.planned_start&&v&&v<value.planned_start)return
+            onChange({...value,planned_end:v})
+          }} />
       </div>
       {value.total_days != null && (
         <div>
