@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { useAppStore } from '../../store'
-import { isAdmin } from '../../utils/permissions'
+import { canAccessFinancialSettings } from '../../utils/permissions'
 import clsx from 'clsx'
 
 const BILLING_TYPES = [
@@ -47,7 +47,7 @@ export default function FinancialSettingsPage() {
   const { user } = useAppStore()
 
   useEffect(() => {
-    if (!isAdmin(user)) navigate('/', { replace: true })
+    if (!canAccessFinancialSettings(user)) navigate('/', { replace: true })
   }, [user, navigate])
 
   // ── Core data ────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export default function FinancialSettingsPage() {
     } finally { setRateSaving(false) }
   }
 
-  if (!isAdmin(user)) return null
+  if (!canAccessFinancialSettings(user)) return null
 
   // ── Shared cell styles ────────────────────────────────────────────────────────
   const tdInput = 'input text-xs h-7 py-0 px-1.5 min-w-0'
@@ -244,10 +244,10 @@ export default function FinancialSettingsPage() {
                  style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>⚙️</div>
             <div>
               <h1 className="text-base font-bold text-gray-900">Financial Settings</h1>
-              <p className="text-xs text-gray-400">Admin-only — manage project billing history and team member cost rates</p>
+              <p className="text-xs text-gray-400">Admin & HR — manage project billing history and team member cost rates</p>
             </div>
           </div>
-          <span className="ml-auto text-xs bg-violet-50 border border-violet-100 text-violet-600 font-medium px-2 py-0.5 rounded-full">🔒 Admin only</span>
+          <span className="ml-auto text-xs bg-violet-50 border border-violet-100 text-violet-600 font-medium px-2 py-0.5 rounded-full">🔒 Admin & HR</span>
         </div>
       </div>
 
