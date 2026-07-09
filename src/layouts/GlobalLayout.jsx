@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store'
-import { isAdmin } from '../utils/permissions'
+import { canAccessFinancialSettings } from '../utils/permissions'
 import clsx from 'clsx'
 
 const GLOBAL_NAV = [
@@ -8,22 +8,20 @@ const GLOBAL_NAV = [
   { icon: '📌', label: 'Task Assignments',   path: '/global/assignments' },
   { icon: '📅', label: 'Deadlines',          path: '/global/deadlines' },
   { icon: '👥', label: 'Team Workload',      path: '/global/workload' },
-  { icon: '⏱️', label: 'Work Hours',         path: '/global/hours' },
+  { icon: '⏱️', label: 'Work Hours',       path: '/global/hours' },
   { icon: '🗓️', label: 'Timesheet Calendar', path: '/global/timesheet' },
-  { icon: '🧑‍🤝‍🧑', label: 'Team Hub',     path: '/global/team' },
+  { icon: '🤝', label: 'Team Hub',           path: '/global/team' },
 ]
 
-// Reporting modules — grouped under a "Reports" section label in the sidebar
 const REPORT_NAV = [
   { icon: '📊', label: 'Project Reports',   path: '/global/reports' },
   { icon: '💹', label: 'Profitability',     path: '/global/profitability' },
-  { icon: '⏰', label: 'Team Utilization',  path: '/global/team-utilization' },
+  { icon: '⏰', label: 'Team Utilization',      path: '/global/team-utilization' },
   { icon: '💰', label: 'Cost Breakdown',    path: '/global/cost-breakdown' },
   { icon: '🧾', label: 'Billing Statement', path: '/global/billing-statement' },
 ]
 
-// Shown only to Admin role
-const ADMIN_NAV = [
+const SETTINGS_NAV = [
   { icon: '⚙️', label: 'Financial Settings', path: '/global/financial-settings' },
 ]
 
@@ -78,11 +76,11 @@ export default function GlobalLayout() {
             )
           })}
 
-          {/* Admin-only section */}
-          {isAdmin(user) && (
+          {/* Financial Settings - Admin + HR */}
+          {canAccessFinancialSettings(user) && (
             <>
-              <div className="text-xs text-slate-600 px-2 pt-4 pb-2 uppercase tracking-wider font-medium">Admin</div>
-              {ADMIN_NAV.map(n => {
+              <div className="text-xs text-slate-600 px-2 pt-4 pb-2 uppercase tracking-wider font-medium">Settings</div>
+              {SETTINGS_NAV.map(n => {
                 const active = location.pathname === n.path
                 return (
                   <button key={n.path} onClick={() => navigate(n.path)}
