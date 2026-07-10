@@ -1180,7 +1180,7 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-fade-up">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-fade-up max-h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
@@ -1219,7 +1219,7 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
         </div>
 
         {/* All 10 milestones grid — always shown */}
-        <div className="px-5 pb-2 max-h-96 overflow-y-auto">
+        <div className="px-5 pb-2 flex-1 overflow-y-auto">
           <div className="grid grid-cols-2 gap-2">
             {templates.map((t) => {
               const isSelected = selected.includes(t.num)
@@ -1416,6 +1416,16 @@ export default function CustomMilestonesPage() {
     setMsg({text,type}); setTimeout(()=>setMsg(null),3500)
   }
 
+  // Targeted single-milestone refresh — no loading flash, no full reload.
+  // Called by MilestoneCard after any save so that changes appear instantly
+  // without re-fetching all milestones.
+  const updateOneMilestone = async (msId) => {
+    try {
+      const res = await api.get(`/projects/${id}/custom-milestones/${msId}`)
+      setMilestones(prev => prev.map(m => m.id === msId ? res.data : m))
+    } catch(e) { console.error('updateOneMilestone failed', e) }
+  }
+
   // items: [{ num, body }] — body is null for "add everything", or
   // { task_nums, subtask_nums } for a selective Task/Subtask copy.
   const handleConfirm = async (items) => {
@@ -1563,14 +1573,14 @@ export default function CustomMilestonesPage() {
       ) : activeTab === 'all' ? (
         <div>
           {milestones.map(ms => (
-            <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={load} team={team}
+            <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={() => updateOneMilestone(ms.id)} team={team}
               onDelete={() => deleteMilestone(ms.id)} forceOpen={false} />
           ))}
         </div>
       ) : (
         <div>
           {milestones.filter(ms => ms.id === activeTab).map(ms => (
-            <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={load} team={team}
+            <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={() => updateOneMilestone(ms.id)} team={team}
               onDelete={() => deleteMilestone(ms.id)} forceOpen />
           ))}
         </div>
