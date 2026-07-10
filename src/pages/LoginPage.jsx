@@ -2,111 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store'
 import api from '../utils/api'
+import connectomeLogo from '../assets/connectome-logo.png'
+import axonLogo from '../assets/axon-logo.png'
 
 const SKIN = '#F5CBA7'
 
-/* ─── Connectome Full Logo SVG ───────────────────────────────────────────────
-   Left hemisphere: blue (#1d6ec6) with white PCB circuit traces
-   Right hemisphere: orange (#e85d1a) with black neural-network nodes
-   Text: CONNECT (blue) + OME (orange)
-   Tagline: "Intelligent insights. Powerful Solutions"
-────────────────────────────────────────────────────────────────────────────── */
-function ConnectomeLogo({ width = 520, height = 152 }) {
-  return (
-    <svg viewBox="0 0 520 152" width={width} height={height} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <clipPath id="clL">
-          <path d="M68,10 C55,10 41,15 30,26 C17,39 9,57 8,76 C7,93 13,112 27,124 C40,136 57,142 68,142 L68,10Z"/>
-        </clipPath>
-        <clipPath id="clR">
-          <path d="M68,10 C81,10 95,15 106,26 C119,39 127,57 128,76 C129,93 123,112 109,124 C96,136 79,142 68,142 L68,10Z"/>
-        </clipPath>
-      </defs>
-
-      {/* ── Left hemisphere (blue) ── */}
-      <path d="M68,10 C55,10 41,15 30,26 C17,39 9,57 8,76 C7,93 13,112 27,124 C40,136 57,142 68,142 L68,10Z"
-            fill="#1d6ec6"/>
-      {/* PCB circuit traces (white) */}
-      <g clipPath="url(#clL)" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        {/* Trace row 1 */}
-        <polyline points="68,28 45,28 45,18 34,18"/>
-        <rect x="40.5" y="23.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        {/* Trace row 2 */}
-        <polyline points="68,48 16,48"/>
-        <rect x="11.5" y="43.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        <rect x="39.5" y="43.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        {/* Trace row 3 — T down */}
-        <polyline points="68,68 22,68 22,56"/>
-        <rect x="17.5" y="51.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        <rect x="17.5" y="63.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        {/* Trace row 4 */}
-        <polyline points="68,90 28,90 28,102 16,102"/>
-        <rect x="11.5" y="97.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        <rect x="23.5" y="85.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        {/* Trace row 5 */}
-        <polyline points="68,112 40,112 40,124 52,124"/>
-        <rect x="47.5" y="119.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-        <rect x="35.5" y="107.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
-      </g>
-
-      {/* ── Right hemisphere (orange) ── */}
-      <path d="M68,10 C81,10 95,15 106,26 C119,39 127,57 128,76 C129,93 123,112 109,124 C96,136 79,142 68,142 L68,10Z"
-            fill="#e85d1a"/>
-      {/* Neural network nodes (black) */}
-      <g clipPath="url(#clR)">
-        {/* Central cluster */}
-        <circle cx="92"  cy="74" r="5.5" fill="#111"/>
-        <circle cx="80"  cy="62" r="4.5" fill="#111"/>
-        <circle cx="104" cy="60" r="4.5" fill="#111"/>
-        <circle cx="110" cy="80" r="4.5" fill="#111"/>
-        <circle cx="100" cy="92" r="4.5" fill="#111"/>
-        <circle cx="82"  cy="90" r="4.5" fill="#111"/>
-        {/* Hub connections */}
-        <g stroke="#111" strokeWidth="1.8">
-          <line x1="92"  y1="74" x2="80"  y2="62"/>
-          <line x1="92"  y1="74" x2="104" y2="60"/>
-          <line x1="92"  y1="74" x2="110" y2="80"/>
-          <line x1="92"  y1="74" x2="100" y2="92"/>
-          <line x1="92"  y1="74" x2="82"  y2="90"/>
-          <line x1="80"  y1="62" x2="104" y2="60"/>
-          <line x1="104" y1="60" x2="110" y2="80"/>
-          <line x1="110" y1="80" x2="100" y2="92"/>
-          <line x1="100" y1="92" x2="82"  y2="90"/>
-          {/* Peripheral arms */}
-          <line x1="80"  y1="62" x2="74"  y2="36"/>
-          <line x1="104" y1="60" x2="112" y2="34"/>
-          <line x1="110" y1="80" x2="124" y2="66"/>
-          <line x1="110" y1="80" x2="124" y2="94"/>
-          <line x1="100" y1="92" x2="106" y2="118"/>
-          <line x1="82"  y1="90" x2="76"  y2="116"/>
-          <line x1="80"  y1="62" x2="72"  y2="46"/>
-        </g>
-        {/* Peripheral nodes */}
-        <circle cx="74"  cy="36"  r="5"   fill="#111"/>
-        <circle cx="112" cy="34"  r="5"   fill="#111"/>
-        <circle cx="124" cy="66"  r="4.5" fill="#111"/>
-        <circle cx="124" cy="94"  r="4.5" fill="#111"/>
-        <circle cx="106" cy="118" r="4"   fill="#111"/>
-        <circle cx="76"  cy="116" r="4"   fill="#111"/>
-        <circle cx="72"  cy="46"  r="4"   fill="#111"/>
-      </g>
-
-      {/* ── Centre dividing line ── */}
-      <line x1="68" y1="10" x2="68" y2="142" stroke="#111" strokeWidth="3.5"/>
-
-      {/* ── CONNECTOME text ── */}
-      <text x="148" y="84" fontFamily="'Arial Black',Arial,sans-serif"
-            fontSize="50" fontWeight="900" letterSpacing="-1.5">
-        <tspan fill="#1d6ec6">CONNECT</tspan><tspan fill="#e85d1a">OME</tspan>
-      </text>
-      {/* ── Tagline ── */}
-      <text x="149" y="112" fontFamily="Arial,sans-serif" fontSize="15.5" letterSpacing="0.2">
-        <tspan fill="#cccccc">Intelligent insights. </tspan>
-        <tspan fill="#e85d1a" fontWeight="700">Powerful Solutions</tspan>
-      </text>
-    </svg>
-  )
-}
 
 /* ─── Axon Full Logo SVG ──────────────────────────────────────────────────────
    Neuron cell body with glow + branching dendrites + long looping axon with
@@ -114,196 +14,7 @@ function ConnectomeLogo({ width = 520, height = 152 }) {
    "AXON" bold text + "REQUIREMENT & TRACKING SYSTEM" subtitle.
    Background: dark navy #0d1935
 ────────────────────────────────────────────────────────────────────────────── */
-function AxonLogoFull({ width = 480, height = 320 }) {
-  return (
-    <svg viewBox="0 0 480 320" width={width} height={height} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        {/* Outer soma ambient glow */}
-        <radialGradient id="axSomaGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#55aaff" stopOpacity="0.55"/>
-          <stop offset="55%"  stopColor="#1155cc" stopOpacity="0.2"/>
-          <stop offset="100%" stopColor="#0a2060" stopOpacity="0"/>
-        </radialGradient>
-        {/* Soma surface gradient */}
-        <radialGradient id="axSomaFill" cx="38%" cy="32%" r="68%">
-          <stop offset="0%"   stopColor="#4499ee"/>
-          <stop offset="45%"  stopColor="#1a4db8"/>
-          <stop offset="100%" stopColor="#0d2860"/>
-        </radialGradient>
-        {/* Nucleus gradient */}
-        <radialGradient id="axNucleus" cx="30%" cy="28%" r="65%">
-          <stop offset="0%"   stopColor="#ffffff"/>
-          <stop offset="30%"  stopColor="#aaddff"/>
-          <stop offset="100%" stopColor="#1a6de0"/>
-        </radialGradient>
-        {/* Axon gradient: blue → orange at terminal */}
-        <linearGradient id="axAxonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="#2288ff"/>
-          <stop offset="65%"  stopColor="#3399ff"/>
-          <stop offset="100%" stopColor="#ff8833"/>
-        </linearGradient>
-        {/* Blue glow filter */}
-        <filter id="axGlow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="4.5" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        {/* Strong glow (nucleus) */}
-        <filter id="axStrongGlow" x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation="7" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        {/* Terminal spark glow */}
-        <filter id="axOrangeGlow" x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation="5" result="b" in="SourceGraphic"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
 
-      {/* ── Dark navy background ── */}
-      <rect width="480" height="320" rx="18" fill="#0d1935"/>
-
-      {/* ═══ NEURON ILLUSTRATION ═══ */}
-
-      {/* Outer ambient glow of soma */}
-      <ellipse cx="170" cy="108" rx="72" ry="68" fill="url(#axSomaGlow)"/>
-
-      {/* ── Dendrites (tree branches above soma) ── */}
-      <g stroke="#2288ff" fill="none" strokeLinecap="round" filter="url(#axGlow)">
-        {/* Main trunk */}
-        <path d="M170,60 L170,22"  strokeWidth="2.5"/>
-        {/* Left main branch */}
-        <path d="M170,42 L144,14"  strokeWidth="2"/>
-        <path d="M144,14 L132,4"   strokeWidth="1.5"/>
-        <path d="M144,14 L136,2"   strokeWidth="1.4"/>
-        {/* Left secondary */}
-        <path d="M170,32 L152,10"  strokeWidth="1.6"/>
-        <path d="M152,10 L145,2"   strokeWidth="1.3"/>
-        {/* Right main branch */}
-        <path d="M170,38 L196,10"  strokeWidth="2"/>
-        <path d="M196,10 L206,2"   strokeWidth="1.5"/>
-        <path d="M196,10 L200,-2"  strokeWidth="1.4"/>
-        {/* Right secondary */}
-        <path d="M170,48 L192,20"  strokeWidth="1.6"/>
-        <path d="M192,20 L204,10"  strokeWidth="1.3"/>
-        {/* Far right */}
-        <path d="M170,55 L208,30"  strokeWidth="1.4"/>
-      </g>
-      {/* Branch tip glow dots */}
-      <g fill="#66ddff" filter="url(#axGlow)">
-        <circle cx="132" cy="4"   r="3"/>
-        <circle cx="136" cy="2"   r="2.5"/>
-        <circle cx="145" cy="2"   r="2.5"/>
-        <circle cx="152" cy="10"  r="2.5"/>
-        <circle cx="170" cy="22"  r="3.5"/>
-        <circle cx="200" cy="-2"  r="2.5"/>
-        <circle cx="206" cy="2"   r="2.5"/>
-        <circle cx="204" cy="10"  r="2.5"/>
-        <circle cx="208" cy="30"  r="2.5"/>
-      </g>
-
-      {/* ── Soma (cell body) ── */}
-      {/* Body surface */}
-      <ellipse cx="170" cy="102" rx="46" ry="52" fill="url(#axSomaFill)" filter="url(#axGlow)"/>
-      {/* Secondary lobe detail */}
-      <ellipse cx="174" cy="122" rx="28" ry="22" fill="#1248a8" opacity="0.55"/>
-      <ellipse cx="166" cy="112" rx="22" ry="18" fill="#1a56c0" opacity="0.6"/>
-      {/* Nucleus */}
-      <circle cx="170" cy="92"  r="24" fill="url(#axNucleus)" filter="url(#axStrongGlow)"/>
-      {/* Bright highlight on nucleus */}
-      <circle cx="164" cy="86"  r="9"  fill="#c8eeff" opacity="0.85"/>
-      <circle cx="162" cy="84"  r="4.5" fill="#ffffff"/>
-
-      {/* ── Axon fibre — loops in an S-curve ── */}
-      {/* Starts at bottom of soma, descends, curves right-down, loops back */}
-      <path d="M 180,152
-               C 195,165 228,174 255,182
-               C 295,194 322,204 318,236
-               C 314,265 282,278 258,272
-               C 234,266 218,246 224,224"
-            stroke="url(#axAxonGrad)" strokeWidth="9" fill="none"
-            strokeLinecap="round" filter="url(#axGlow)"/>
-
-      {/* ── Myelin sheaths (small ellipses perpendicular to axon) ── */}
-      <g stroke="#88ccff" strokeWidth="2" fill="none" opacity="0.88">
-        <ellipse cx="190" cy="158" rx="13" ry="4.5" transform="rotate(28,190,158)"/>
-        <ellipse cx="206" cy="166" rx="13" ry="4.5" transform="rotate(20,206,166)"/>
-        <ellipse cx="223" cy="173" rx="13" ry="4.5" transform="rotate(12,223,173)"/>
-        <ellipse cx="240" cy="178" rx="13" ry="4.5" transform="rotate(4,240,178)"/>
-        <ellipse cx="258" cy="183" rx="13" ry="4.5" transform="rotate(-5,258,183)"/>
-        <ellipse cx="276" cy="188" rx="13" ry="4.5" transform="rotate(-14,276,188)"/>
-        <ellipse cx="296" cy="196" rx="13" ry="4.5" transform="rotate(-28,296,196)"/>
-        <ellipse cx="312" cy="207" rx="13" ry="4.5" transform="rotate(-52,312,207)"/>
-        <ellipse cx="320" cy="222" rx="13" ry="4.5" transform="rotate(-78,320,222)"/>
-        <ellipse cx="317" cy="240" rx="13" ry="4.5" transform="rotate(-105,317,240)"/>
-        <ellipse cx="303" cy="258" rx="13" ry="4.5" transform="rotate(-130,303,258)"/>
-        <ellipse cx="282" cy="270" rx="13" ry="4.5" transform="rotate(-150,282,270)"/>
-        <ellipse cx="260" cy="273" rx="13" ry="4.5" transform="rotate(165,260,273)"/>
-        <ellipse cx="240" cy="265" rx="13" ry="4.5" transform="rotate(142,240,265)"/>
-        <ellipse cx="227" cy="248" rx="13" ry="4.5" transform="rotate(118,227,248)"/>
-      </g>
-
-      {/* ── Terminal (axon end) with orange glow sparks ── */}
-      <circle cx="224" cy="224" r="7" fill="#ff9933" filter="url(#axOrangeGlow)"/>
-      <circle cx="224" cy="224" r="3.5" fill="#ffdd88"/>
-      <g stroke="#ffaa33" strokeWidth="2.2" strokeLinecap="round" filter="url(#axOrangeGlow)">
-        <line x1="224" y1="213" x2="224" y2="208"/>
-        <line x1="233" y1="216" x2="237" y2="213"/>
-        <line x1="234" y1="230" x2="238" y2="234"/>
-        <line x1="214" y1="230" x2="210" y2="234"/>
-        <line x1="215" y1="216" x2="211" y2="213"/>
-      </g>
-
-      {/* ═══ AXON TEXT ═══ */}
-      <text x="54" y="294"
-            fontFamily="'Arial Black',Impact,Arial,sans-serif"
-            fontSize="92" fontWeight="900" letterSpacing="8"
-            fill="#1e6de8">AXON</text>
-
-      {/* ── Subtitle (changed from original) ── */}
-      <text x="57" y="316"
-            fontFamily="Arial,sans-serif" fontSize="12.5"
-            letterSpacing="3.8" fill="#4d6a9a">
-        REQUIREMENT &amp; TRACKING SYSTEM
-      </text>
-
-      {/* ── Star sparkle (bottom-right, per original) ── */}
-      <text x="458" y="316" fontSize="16" fill="#2a3d5e">✦</text>
-    </svg>
-  )
-}
-
-/* ─── Small Axon icon (mobile + form header) ──────────────────────────────── */
-function AxonIcon({ size = 38 }) {
-  return (
-    <svg viewBox="0 0 76 76" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      <circle cx="38" cy="38" r="36" fill="#0d1935"/>
-      <circle cx="38" cy="38" r="36" fill="none" stroke="#1e6de8" strokeWidth="2.5"/>
-      {/* Mini dendrites */}
-      <g stroke="#2288ff" fill="none" strokeLinecap="round">
-        <path d="M38,24 L38,12" strokeWidth="2"/>
-        <path d="M38,16 L28,8"  strokeWidth="1.5"/>
-        <path d="M38,16 L48,8"  strokeWidth="1.5"/>
-        <path d="M38,20 L30,10" strokeWidth="1.2"/>
-        <path d="M38,20 L46,10" strokeWidth="1.2"/>
-      </g>
-      {/* Soma */}
-      <ellipse cx="38" cy="34" rx="11" ry="13" fill="#1a4db8"/>
-      {/* Nucleus */}
-      <circle cx="38" cy="30" r="6.5" fill="#66aaff"/>
-      <circle cx="36" cy="28" r="3"   fill="#ffffff"/>
-      {/* Axon loop */}
-      <path d="M42,46 C52,50 58,58 54,66 C50,72 42,74 36,70"
-            stroke="#2288ff" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
-      {/* 3 myelin sheaths */}
-      <ellipse cx="48" cy="50" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(20,48,50)"/>
-      <ellipse cx="54" cy="57" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(-25,54,57)"/>
-      <ellipse cx="52" cy="65" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(-65,52,65)"/>
-      {/* Terminal spark */}
-      <circle cx="36" cy="70" r="3.5" fill="#ff9933"/>
-      <circle cx="36" cy="70" r="1.5" fill="#ffee88"/>
-    </svg>
-  )
-}
 
 /* ─── Role Avatar Components (unchanged) ─────────────────────────────────── */
 function AdminAvatar() {
@@ -566,13 +277,7 @@ function SplashScreen({ userName, userRole }) {
       </div>
       {/* Axon branding in splash */}
       <div style={{animation:'splashFadeUp 0.6s ease 0.4s both',textAlign:'center',marginBottom:6}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:3}}>
-          <AxonIcon size={28}/>
-          <span style={{fontSize:26,fontWeight:900,color:'#1e6de8',letterSpacing:2}}>AXON</span>
-        </div>
-        <p style={{color:'#475569',fontSize:11,margin:0,letterSpacing:'0.1em',textTransform:'uppercase'}}>
-          Requirement &amp; Tracking System
-        </p>
+        <img src={axonLogo} alt="Axon" style={{height:90,objectFit:'contain',marginBottom:4}}/>
         <p style={{color:'#334155',fontSize:10,margin:'2px 0 0',letterSpacing:'0.06em'}}>by Connectome</p>
       </div>
       {userName && (
@@ -666,12 +371,12 @@ export default function LoginPage() {
 
           {/* ── Top: Connectome company logo ── */}
           <div className="relative z-10">
-            <ConnectomeLogo width={380} height={112}/>
+            <img src={connectomeLogo} alt="Connectome" style={{width:380,objectFit:"contain"}}/>
           </div>
 
           {/* ── Centre: Axon product logo ── */}
           <div className="relative z-10 flex flex-col items-start">
-            <AxonLogoFull width={440} height={293}/>
+            <img src={axonLogo} alt="Axon — Requirement &amp; Tracking System" style={{width:440,objectFit:"contain"}}/>
             <p style={{color:'#4a6080',fontSize:13,lineHeight:1.75,maxWidth:400,margin:'16px 0 0'}}>
               Manage milestones, assignments, and project timelines in one intelligent workspace — built for cross-functional teams.
             </p>
@@ -692,13 +397,7 @@ export default function LoginPage() {
 
           {/* Mobile only: Axon icon + name */}
           <div className="flex lg:hidden flex-col items-center mb-8">
-            <div className="flex items-center gap-3 mb-1">
-              <AxonIcon size={42}/>
-              <div>
-                <div style={{fontSize:26,fontWeight:900,color:'#0f172a',letterSpacing:1}}>AXON</div>
-                <div style={{fontSize:10,color:'#e85d1a',fontWeight:700,letterSpacing:'0.08em'}}>by Connectome</div>
-              </div>
-            </div>
+            <img src={axonLogo} alt="Axon" style={{height:80,objectFit:'contain'}}/>
           </div>
 
           <div className="w-full max-w-sm">
