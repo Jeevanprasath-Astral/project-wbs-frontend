@@ -5,71 +5,307 @@ import api from '../utils/api'
 
 const SKIN = '#F5CBA7'
 
-/* ─── Connectome Brain/Circuit Logo ──────────────────────────────────────────*/
-function ConnectomeLogo({ size = 56 }) {
+/* ─── Connectome Full Logo SVG ───────────────────────────────────────────────
+   Left hemisphere: blue (#1d6ec6) with white PCB circuit traces
+   Right hemisphere: orange (#e85d1a) with black neural-network nodes
+   Text: CONNECT (blue) + OME (orange)
+   Tagline: "Intelligent insights. Powerful Solutions"
+────────────────────────────────────────────────────────────────────────────── */
+function ConnectomeLogo({ width = 520, height = 152 }) {
   return (
-    <svg viewBox="0 0 120 120" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      {/* Brain silhouette */}
-      <ellipse cx="60" cy="55" rx="44" ry="38" fill="#1a4db8" opacity="0.15"/>
-      {/* Left hemisphere */}
-      <path d="M18 55 Q16 35 30 25 Q42 16 55 20 Q60 22 60 55 Q60 72 55 78 Q42 84 30 80 Q16 75 18 55Z"
-        fill="#1a4db8" opacity="0.9"/>
-      {/* Right hemisphere */}
-      <path d="M102 55 Q104 35 90 25 Q78 16 65 20 Q60 22 60 55 Q60 72 65 78 Q78 84 90 80 Q104 75 102 55Z"
-        fill="#1a4db8" opacity="0.75"/>
-      {/* Neural circuit lines - left */}
-      <path d="M28 42 L40 42 L40 35 L50 35" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <path d="M28 55 L45 55" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <path d="M28 68 L38 68 L38 60 L48 60" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      {/* Neural circuit lines - right */}
-      <path d="M92 42 L80 42 L80 35 L70 35" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <path d="M92 55 L75 55" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <path d="M92 68 L82 68 L82 60 L72 60" stroke="#e8571a" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      {/* Center dividing line */}
-      <line x1="60" y1="22" x2="60" y2="78" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeDasharray="4,3"/>
-      {/* Synapse nodes */}
-      <circle cx="40" cy="42" r="3" fill="#e8571a"/>
-      <circle cx="45" cy="55" r="3" fill="#e8571a"/>
-      <circle cx="38" cy="68" r="3" fill="#e8571a"/>
-      <circle cx="80" cy="42" r="3" fill="#e8571a"/>
-      <circle cx="75" cy="55" r="3" fill="#e8571a"/>
-      <circle cx="82" cy="68" r="3" fill="#e8571a"/>
-      {/* Central nucleus */}
-      <circle cx="60" cy="55" r="5" fill="#fff" opacity="0.9"/>
-      <circle cx="60" cy="55" r="2.5" fill="#e8571a"/>
-      {/* Bottom stem */}
-      <rect x="55" y="78" width="10" height="14" rx="5" fill="#1a4db8"/>
-      <rect x="44" y="90" width="32" height="5" rx="2.5" fill="#1a4db8" opacity="0.6"/>
+    <svg viewBox="0 0 520 152" width={width} height={height} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="clL">
+          <path d="M68,10 C55,10 41,15 30,26 C17,39 9,57 8,76 C7,93 13,112 27,124 C40,136 57,142 68,142 L68,10Z"/>
+        </clipPath>
+        <clipPath id="clR">
+          <path d="M68,10 C81,10 95,15 106,26 C119,39 127,57 128,76 C129,93 123,112 109,124 C96,136 79,142 68,142 L68,10Z"/>
+        </clipPath>
+      </defs>
+
+      {/* ── Left hemisphere (blue) ── */}
+      <path d="M68,10 C55,10 41,15 30,26 C17,39 9,57 8,76 C7,93 13,112 27,124 C40,136 57,142 68,142 L68,10Z"
+            fill="#1d6ec6"/>
+      {/* PCB circuit traces (white) */}
+      <g clipPath="url(#clL)" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {/* Trace row 1 */}
+        <polyline points="68,28 45,28 45,18 34,18"/>
+        <rect x="40.5" y="23.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        {/* Trace row 2 */}
+        <polyline points="68,48 16,48"/>
+        <rect x="11.5" y="43.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        <rect x="39.5" y="43.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        {/* Trace row 3 — T down */}
+        <polyline points="68,68 22,68 22,56"/>
+        <rect x="17.5" y="51.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        <rect x="17.5" y="63.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        {/* Trace row 4 */}
+        <polyline points="68,90 28,90 28,102 16,102"/>
+        <rect x="11.5" y="97.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        <rect x="23.5" y="85.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        {/* Trace row 5 */}
+        <polyline points="68,112 40,112 40,124 52,124"/>
+        <rect x="47.5" y="119.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+        <rect x="35.5" y="107.5" width="9" height="9" fill="#fff" stroke="none" rx="1.5"/>
+      </g>
+
+      {/* ── Right hemisphere (orange) ── */}
+      <path d="M68,10 C81,10 95,15 106,26 C119,39 127,57 128,76 C129,93 123,112 109,124 C96,136 79,142 68,142 L68,10Z"
+            fill="#e85d1a"/>
+      {/* Neural network nodes (black) */}
+      <g clipPath="url(#clR)">
+        {/* Central cluster */}
+        <circle cx="92"  cy="74" r="5.5" fill="#111"/>
+        <circle cx="80"  cy="62" r="4.5" fill="#111"/>
+        <circle cx="104" cy="60" r="4.5" fill="#111"/>
+        <circle cx="110" cy="80" r="4.5" fill="#111"/>
+        <circle cx="100" cy="92" r="4.5" fill="#111"/>
+        <circle cx="82"  cy="90" r="4.5" fill="#111"/>
+        {/* Hub connections */}
+        <g stroke="#111" strokeWidth="1.8">
+          <line x1="92"  y1="74" x2="80"  y2="62"/>
+          <line x1="92"  y1="74" x2="104" y2="60"/>
+          <line x1="92"  y1="74" x2="110" y2="80"/>
+          <line x1="92"  y1="74" x2="100" y2="92"/>
+          <line x1="92"  y1="74" x2="82"  y2="90"/>
+          <line x1="80"  y1="62" x2="104" y2="60"/>
+          <line x1="104" y1="60" x2="110" y2="80"/>
+          <line x1="110" y1="80" x2="100" y2="92"/>
+          <line x1="100" y1="92" x2="82"  y2="90"/>
+          {/* Peripheral arms */}
+          <line x1="80"  y1="62" x2="74"  y2="36"/>
+          <line x1="104" y1="60" x2="112" y2="34"/>
+          <line x1="110" y1="80" x2="124" y2="66"/>
+          <line x1="110" y1="80" x2="124" y2="94"/>
+          <line x1="100" y1="92" x2="106" y2="118"/>
+          <line x1="82"  y1="90" x2="76"  y2="116"/>
+          <line x1="80"  y1="62" x2="72"  y2="46"/>
+        </g>
+        {/* Peripheral nodes */}
+        <circle cx="74"  cy="36"  r="5"   fill="#111"/>
+        <circle cx="112" cy="34"  r="5"   fill="#111"/>
+        <circle cx="124" cy="66"  r="4.5" fill="#111"/>
+        <circle cx="124" cy="94"  r="4.5" fill="#111"/>
+        <circle cx="106" cy="118" r="4"   fill="#111"/>
+        <circle cx="76"  cy="116" r="4"   fill="#111"/>
+        <circle cx="72"  cy="46"  r="4"   fill="#111"/>
+      </g>
+
+      {/* ── Centre dividing line ── */}
+      <line x1="68" y1="10" x2="68" y2="142" stroke="#111" strokeWidth="3.5"/>
+
+      {/* ── CONNECTOME text ── */}
+      <text x="148" y="84" fontFamily="'Arial Black',Arial,sans-serif"
+            fontSize="50" fontWeight="900" letterSpacing="-1.5">
+        <tspan fill="#1d6ec6">CONNECT</tspan><tspan fill="#e85d1a">OME</tspan>
+      </text>
+      {/* ── Tagline ── */}
+      <text x="149" y="112" fontFamily="Arial,sans-serif" fontSize="15.5" letterSpacing="0.2">
+        <tspan fill="#cccccc">Intelligent insights. </tspan>
+        <tspan fill="#e85d1a" fontWeight="700">Powerful Solutions</tspan>
+      </text>
     </svg>
   )
 }
 
-/* ─── Axon Logo ───────────────────────────────────────────────────────────────*/
-function AxonLogo({ size = 40 }) {
+/* ─── Axon Full Logo SVG ──────────────────────────────────────────────────────
+   Neuron cell body with glow + branching dendrites + long looping axon with
+   myelin sheaths + orange terminal sparks.
+   "AXON" bold text + "REQUIREMENT & TRACKING SYSTEM" subtitle.
+   Background: dark navy #0d1935
+────────────────────────────────────────────────────────────────────────────── */
+function AxonLogoFull({ width = 480, height = 320 }) {
   return (
-    <svg viewBox="0 0 80 80" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      {/* Background circle */}
-      <circle cx="40" cy="40" r="38" fill="#1a4db8"/>
-      <circle cx="40" cy="40" r="38" fill="none" stroke="#e8571a" strokeWidth="2.5"/>
-      {/* Axon shape: neural fiber / lightning bolt hybrid */}
-      {/* Left dendrite arm */}
-      <path d="M14 58 L30 40 L24 32" stroke="#fff" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="14" cy="58" r="4" fill="#e8571a"/>
-      <circle cx="24" cy="32" r="3.5" fill="#fff" opacity="0.8"/>
-      {/* Right dendrite arm */}
-      <path d="M66 58 L50 40 L56 32" stroke="#fff" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="66" cy="58" r="4" fill="#e8571a"/>
-      <circle cx="56" cy="32" r="3.5" fill="#fff" opacity="0.8"/>
-      {/* Central axon bolt */}
-      <path d="M44 18 L34 40 L42 40 L36 62" stroke="#e8571a" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Node at center synapse */}
-      <circle cx="40" cy="40" r="5" fill="#fff"/>
-      <circle cx="40" cy="40" r="2.5" fill="#e8571a"/>
+    <svg viewBox="0 0 480 320" width={width} height={height} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        {/* Outer soma ambient glow */}
+        <radialGradient id="axSomaGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#55aaff" stopOpacity="0.55"/>
+          <stop offset="55%"  stopColor="#1155cc" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#0a2060" stopOpacity="0"/>
+        </radialGradient>
+        {/* Soma surface gradient */}
+        <radialGradient id="axSomaFill" cx="38%" cy="32%" r="68%">
+          <stop offset="0%"   stopColor="#4499ee"/>
+          <stop offset="45%"  stopColor="#1a4db8"/>
+          <stop offset="100%" stopColor="#0d2860"/>
+        </radialGradient>
+        {/* Nucleus gradient */}
+        <radialGradient id="axNucleus" cx="30%" cy="28%" r="65%">
+          <stop offset="0%"   stopColor="#ffffff"/>
+          <stop offset="30%"  stopColor="#aaddff"/>
+          <stop offset="100%" stopColor="#1a6de0"/>
+        </radialGradient>
+        {/* Axon gradient: blue → orange at terminal */}
+        <linearGradient id="axAxonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor="#2288ff"/>
+          <stop offset="65%"  stopColor="#3399ff"/>
+          <stop offset="100%" stopColor="#ff8833"/>
+        </linearGradient>
+        {/* Blue glow filter */}
+        <filter id="axGlow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        {/* Strong glow (nucleus) */}
+        <filter id="axStrongGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="7" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        {/* Terminal spark glow */}
+        <filter id="axOrangeGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="5" result="b" in="SourceGraphic"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* ── Dark navy background ── */}
+      <rect width="480" height="320" rx="18" fill="#0d1935"/>
+
+      {/* ═══ NEURON ILLUSTRATION ═══ */}
+
+      {/* Outer ambient glow of soma */}
+      <ellipse cx="170" cy="108" rx="72" ry="68" fill="url(#axSomaGlow)"/>
+
+      {/* ── Dendrites (tree branches above soma) ── */}
+      <g stroke="#2288ff" fill="none" strokeLinecap="round" filter="url(#axGlow)">
+        {/* Main trunk */}
+        <path d="M170,60 L170,22"  strokeWidth="2.5"/>
+        {/* Left main branch */}
+        <path d="M170,42 L144,14"  strokeWidth="2"/>
+        <path d="M144,14 L132,4"   strokeWidth="1.5"/>
+        <path d="M144,14 L136,2"   strokeWidth="1.4"/>
+        {/* Left secondary */}
+        <path d="M170,32 L152,10"  strokeWidth="1.6"/>
+        <path d="M152,10 L145,2"   strokeWidth="1.3"/>
+        {/* Right main branch */}
+        <path d="M170,38 L196,10"  strokeWidth="2"/>
+        <path d="M196,10 L206,2"   strokeWidth="1.5"/>
+        <path d="M196,10 L200,-2"  strokeWidth="1.4"/>
+        {/* Right secondary */}
+        <path d="M170,48 L192,20"  strokeWidth="1.6"/>
+        <path d="M192,20 L204,10"  strokeWidth="1.3"/>
+        {/* Far right */}
+        <path d="M170,55 L208,30"  strokeWidth="1.4"/>
+      </g>
+      {/* Branch tip glow dots */}
+      <g fill="#66ddff" filter="url(#axGlow)">
+        <circle cx="132" cy="4"   r="3"/>
+        <circle cx="136" cy="2"   r="2.5"/>
+        <circle cx="145" cy="2"   r="2.5"/>
+        <circle cx="152" cy="10"  r="2.5"/>
+        <circle cx="170" cy="22"  r="3.5"/>
+        <circle cx="200" cy="-2"  r="2.5"/>
+        <circle cx="206" cy="2"   r="2.5"/>
+        <circle cx="204" cy="10"  r="2.5"/>
+        <circle cx="208" cy="30"  r="2.5"/>
+      </g>
+
+      {/* ── Soma (cell body) ── */}
+      {/* Body surface */}
+      <ellipse cx="170" cy="102" rx="46" ry="52" fill="url(#axSomaFill)" filter="url(#axGlow)"/>
+      {/* Secondary lobe detail */}
+      <ellipse cx="174" cy="122" rx="28" ry="22" fill="#1248a8" opacity="0.55"/>
+      <ellipse cx="166" cy="112" rx="22" ry="18" fill="#1a56c0" opacity="0.6"/>
+      {/* Nucleus */}
+      <circle cx="170" cy="92"  r="24" fill="url(#axNucleus)" filter="url(#axStrongGlow)"/>
+      {/* Bright highlight on nucleus */}
+      <circle cx="164" cy="86"  r="9"  fill="#c8eeff" opacity="0.85"/>
+      <circle cx="162" cy="84"  r="4.5" fill="#ffffff"/>
+
+      {/* ── Axon fibre — loops in an S-curve ── */}
+      {/* Starts at bottom of soma, descends, curves right-down, loops back */}
+      <path d="M 180,152
+               C 195,165 228,174 255,182
+               C 295,194 322,204 318,236
+               C 314,265 282,278 258,272
+               C 234,266 218,246 224,224"
+            stroke="url(#axAxonGrad)" strokeWidth="9" fill="none"
+            strokeLinecap="round" filter="url(#axGlow)"/>
+
+      {/* ── Myelin sheaths (small ellipses perpendicular to axon) ── */}
+      <g stroke="#88ccff" strokeWidth="2" fill="none" opacity="0.88">
+        <ellipse cx="190" cy="158" rx="13" ry="4.5" transform="rotate(28,190,158)"/>
+        <ellipse cx="206" cy="166" rx="13" ry="4.5" transform="rotate(20,206,166)"/>
+        <ellipse cx="223" cy="173" rx="13" ry="4.5" transform="rotate(12,223,173)"/>
+        <ellipse cx="240" cy="178" rx="13" ry="4.5" transform="rotate(4,240,178)"/>
+        <ellipse cx="258" cy="183" rx="13" ry="4.5" transform="rotate(-5,258,183)"/>
+        <ellipse cx="276" cy="188" rx="13" ry="4.5" transform="rotate(-14,276,188)"/>
+        <ellipse cx="296" cy="196" rx="13" ry="4.5" transform="rotate(-28,296,196)"/>
+        <ellipse cx="312" cy="207" rx="13" ry="4.5" transform="rotate(-52,312,207)"/>
+        <ellipse cx="320" cy="222" rx="13" ry="4.5" transform="rotate(-78,320,222)"/>
+        <ellipse cx="317" cy="240" rx="13" ry="4.5" transform="rotate(-105,317,240)"/>
+        <ellipse cx="303" cy="258" rx="13" ry="4.5" transform="rotate(-130,303,258)"/>
+        <ellipse cx="282" cy="270" rx="13" ry="4.5" transform="rotate(-150,282,270)"/>
+        <ellipse cx="260" cy="273" rx="13" ry="4.5" transform="rotate(165,260,273)"/>
+        <ellipse cx="240" cy="265" rx="13" ry="4.5" transform="rotate(142,240,265)"/>
+        <ellipse cx="227" cy="248" rx="13" ry="4.5" transform="rotate(118,227,248)"/>
+      </g>
+
+      {/* ── Terminal (axon end) with orange glow sparks ── */}
+      <circle cx="224" cy="224" r="7" fill="#ff9933" filter="url(#axOrangeGlow)"/>
+      <circle cx="224" cy="224" r="3.5" fill="#ffdd88"/>
+      <g stroke="#ffaa33" strokeWidth="2.2" strokeLinecap="round" filter="url(#axOrangeGlow)">
+        <line x1="224" y1="213" x2="224" y2="208"/>
+        <line x1="233" y1="216" x2="237" y2="213"/>
+        <line x1="234" y1="230" x2="238" y2="234"/>
+        <line x1="214" y1="230" x2="210" y2="234"/>
+        <line x1="215" y1="216" x2="211" y2="213"/>
+      </g>
+
+      {/* ═══ AXON TEXT ═══ */}
+      <text x="54" y="294"
+            fontFamily="'Arial Black',Impact,Arial,sans-serif"
+            fontSize="92" fontWeight="900" letterSpacing="8"
+            fill="#1e6de8">AXON</text>
+
+      {/* ── Subtitle (changed from original) ── */}
+      <text x="57" y="316"
+            fontFamily="Arial,sans-serif" fontSize="12.5"
+            letterSpacing="3.8" fill="#4d6a9a">
+        REQUIREMENT &amp; TRACKING SYSTEM
+      </text>
+
+      {/* ── Star sparkle (bottom-right, per original) ── */}
+      <text x="458" y="316" fontSize="16" fill="#2a3d5e">✦</text>
     </svg>
   )
 }
 
-/* ─── Role Avatar Components (unchanged) ─────────────────────────────────────*/
+/* ─── Small Axon icon (mobile + form header) ──────────────────────────────── */
+function AxonIcon({ size = 38 }) {
+  return (
+    <svg viewBox="0 0 76 76" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
+      <circle cx="38" cy="38" r="36" fill="#0d1935"/>
+      <circle cx="38" cy="38" r="36" fill="none" stroke="#1e6de8" strokeWidth="2.5"/>
+      {/* Mini dendrites */}
+      <g stroke="#2288ff" fill="none" strokeLinecap="round">
+        <path d="M38,24 L38,12" strokeWidth="2"/>
+        <path d="M38,16 L28,8"  strokeWidth="1.5"/>
+        <path d="M38,16 L48,8"  strokeWidth="1.5"/>
+        <path d="M38,20 L30,10" strokeWidth="1.2"/>
+        <path d="M38,20 L46,10" strokeWidth="1.2"/>
+      </g>
+      {/* Soma */}
+      <ellipse cx="38" cy="34" rx="11" ry="13" fill="#1a4db8"/>
+      {/* Nucleus */}
+      <circle cx="38" cy="30" r="6.5" fill="#66aaff"/>
+      <circle cx="36" cy="28" r="3"   fill="#ffffff"/>
+      {/* Axon loop */}
+      <path d="M42,46 C52,50 58,58 54,66 C50,72 42,74 36,70"
+            stroke="#2288ff" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+      {/* 3 myelin sheaths */}
+      <ellipse cx="48" cy="50" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(20,48,50)"/>
+      <ellipse cx="54" cy="57" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(-25,54,57)"/>
+      <ellipse cx="52" cy="65" rx="6.5" ry="2.5" stroke="#88ccff" strokeWidth="1.5" fill="none" transform="rotate(-65,52,65)"/>
+      {/* Terminal spark */}
+      <circle cx="36" cy="70" r="3.5" fill="#ff9933"/>
+      <circle cx="36" cy="70" r="1.5" fill="#ffee88"/>
+    </svg>
+  )
+}
+
+/* ─── Role Avatar Components (unchanged) ─────────────────────────────────── */
 function AdminAvatar() {
   return (
     <svg viewBox="0 0 100 115" width="126" height="144" xmlns="http://www.w3.org/2000/svg">
@@ -279,10 +515,10 @@ function getRoleConfig(role) {
     return { ring:'#22d3ee', grad:'linear-gradient(135deg,#22d3ee,#0284c7)', welcome:"Systems online. Let's build", emoji:'⚙️' }
   if (r.includes('hr'))
     return { ring:'#ec4899', grad:'linear-gradient(135deg,#ec4899,#be185d)', welcome:"So glad you're here today!", emoji:'💗' }
-  return { ring:'#a78bfa', grad:'linear-gradient(135deg,#a78bfa,#60a5fa)', welcome:'Welcome back', emoji:'👋' }
+  return { ring:'#1d6ec6', grad:'linear-gradient(135deg,#1d6ec6,#e85d1a)', welcome:'Welcome back', emoji:'👋' }
 }
 
-/* ─── Animated Splash Screen (post-login, role-based avatar) ─────────────── */
+/* ─── Animated Splash Screen ─────────────────────────────────────────────── */
 function SplashScreen({ userName, userRole }) {
   const [phase, setPhase] = useState(0)
   const cfg = getRoleConfig(userRole)
@@ -294,154 +530,78 @@ function SplashScreen({ userName, userRole }) {
   }, [])
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
-      style={{
-        background: 'linear-gradient(135deg, #0a1628 0%, #0d2348 50%, #0a1628 100%)',
-        opacity: phase === 2 ? 0 : 1,
-        transition: 'opacity 0.6s ease',
-        pointerEvents: 'none',
-      }}
-    >
-      <div style={{
-        position:'absolute', top:'15%', left:'10%',
-        width:320, height:320, borderRadius:'50%',
-        background:`radial-gradient(circle, ${cfg.ring}40, transparent)`,
-        animation:'splashFloat 6s ease-in-out infinite',
-      }}/>
-      <div style={{
-        position:'absolute', bottom:'10%', right:'8%',
-        width:400, height:400, borderRadius:'50%',
-        background:'radial-gradient(circle, rgba(26,77,184,0.25), transparent)',
-        animation:'splashFloat 8s ease-in-out infinite 1s',
-      }}/>
-      <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0.05 }}>
-        {Array.from({length:20}, (_,i) => (
-          <line key={`h${i}`} x1="0" y1={`${i*5}%`} x2="100%" y2={`${i*5}%`} stroke="#1a4db8" strokeWidth="1"/>
-        ))}
-        {Array.from({length:20}, (_,i) => (
-          <line key={`v${i}`} x1={`${i*5}%`} y1="0" x2={`${i*5}%`} y2="100%" stroke="#1a4db8" strokeWidth="1"/>
-        ))}
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
+         style={{
+           background:'linear-gradient(135deg,#0a1628 0%,#0d2348 50%,#0a1628 100%)',
+           opacity: phase === 2 ? 0 : 1,
+           transition:'opacity 0.6s ease',
+           pointerEvents:'none',
+         }}>
+      <div style={{position:'absolute',top:'15%',left:'10%',width:320,height:320,borderRadius:'50%',
+        background:`radial-gradient(circle,${cfg.ring}40,transparent)`,animation:'splashFloat 6s ease-in-out infinite'}}/>
+      <div style={{position:'absolute',bottom:'10%',right:'8%',width:400,height:400,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(26,77,184,0.25),transparent)',animation:'splashFloat 8s ease-in-out infinite 1s'}}/>
+      <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:0.04}}>
+        {Array.from({length:20},(_,i)=><line key={`h${i}`} x1="0" y1={`${i*5}%`} x2="100%" y2={`${i*5}%`} stroke="#1a4db8" strokeWidth="1"/>)}
+        {Array.from({length:20},(_,i)=><line key={`v${i}`} x1={`${i*5}%`} y1="0" x2={`${i*5}%`} y2="100%" stroke="#1a4db8" strokeWidth="1"/>)}
       </svg>
-      <div style={{ position:'relative', width:200, height:200, marginBottom:24 }}>
-        <div style={{
-          position:'absolute', inset:-20,
-          border:`1px solid ${cfg.ring}33`,
-          borderRadius:'50%',
-          animation:'splashPulse 2s ease-in-out infinite',
-        }}/>
-        <svg viewBox="0 0 200 200" style={{ width:200, height:200, transform:'rotate(-90deg)', position:'absolute', inset:0 }}>
+      <div style={{position:'relative',width:200,height:200,marginBottom:20}}>
+        <div style={{position:'absolute',inset:-20,border:`1px solid ${cfg.ring}33`,borderRadius:'50%',animation:'splashPulse 2s ease-in-out infinite'}}/>
+        <svg viewBox="0 0 200 200" style={{width:200,height:200,transform:'rotate(-90deg)',position:'absolute',inset:0}}>
           <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6"/>
-          <circle cx="100" cy="100" r="92" fill="none"
-            stroke="url(#splashGrad)" strokeWidth="6"
+          <circle cx="100" cy="100" r="92" fill="none" stroke="url(#spGrad)" strokeWidth="6"
             strokeLinecap="round" strokeDasharray="578" strokeDashoffset="578"
-            style={{ animation:'splashProgress 2s ease-out 0.2s forwards' }}
-          />
+            style={{animation:'splashProgress 2s ease-out 0.2s forwards'}}/>
           <defs>
-            <linearGradient id="splashGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient id="spGrad" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor={cfg.ring}/>
-              <stop offset="100%" stopColor="#e8571a"/>
+              <stop offset="100%" stopColor="#e85d1a"/>
             </linearGradient>
           </defs>
         </svg>
-        <div style={{
-          position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-          animation:'splashLogoPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both',
-        }}>
+        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+          animation:'splashLogoPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both'}}>
           {getRoleAvatar(userRole)}
         </div>
       </div>
-      <div style={{ animation:'splashFadeUp 0.6s ease 0.4s both', textAlign:'center', marginBottom:8 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:4 }}>
-          <AxonLogo size={32} />
-          <h1 style={{ fontSize:28, fontWeight:800, color:'#fff', letterSpacing:'-0.02em', margin:0 }}>
-            <span style={{ background:'linear-gradient(135deg,#1a4db8,#e8571a)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Axon</span>
-          </h1>
+      {/* Axon branding in splash */}
+      <div style={{animation:'splashFadeUp 0.6s ease 0.4s both',textAlign:'center',marginBottom:6}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:3}}>
+          <AxonIcon size={28}/>
+          <span style={{fontSize:26,fontWeight:900,color:'#1e6de8',letterSpacing:2}}>AXON</span>
         </div>
-        <p style={{ color:'#64748b', fontSize:12, margin:'0', letterSpacing:'0.08em', textTransform:'uppercase' }}>
+        <p style={{color:'#475569',fontSize:11,margin:0,letterSpacing:'0.1em',textTransform:'uppercase'}}>
           Requirement &amp; Tracking System
         </p>
-        <p style={{ color:'#475569', fontSize:11, margin:'4px 0 0', letterSpacing:'0.06em' }}>
-          by Connectome
-        </p>
+        <p style={{color:'#334155',fontSize:10,margin:'2px 0 0',letterSpacing:'0.06em'}}>by Connectome</p>
       </div>
       {userName && (
-        <div style={{
-          animation:'splashFadeUp 0.6s ease 0.7s both',
-          color: cfg.ring, fontSize:13, marginBottom:32, fontWeight:500, textAlign:'center',
-        }}>
+        <div style={{animation:'splashFadeUp 0.6s ease 0.7s both',color:cfg.ring,fontSize:13,marginBottom:28,fontWeight:500,textAlign:'center'}}>
           {cfg.emoji} {cfg.welcome}, <strong style={{color:'#fff'}}>{userName}</strong>!
         </div>
       )}
-      <div style={{ display:'flex', gap:8, animation:'splashFadeUp 0.6s ease 0.9s both' }}>
-        {[0,1,2,3,4].map(i => (
-          <div key={i} style={{
-            width:6, height:6, borderRadius:'50%',
-            background: cfg.grad,
-            animation:`splashDot 1.2s ease-in-out ${i*0.15}s infinite`,
-          }}/>
+      <div style={{display:'flex',gap:8,animation:'splashFadeUp 0.6s ease 0.9s both'}}>
+        {[0,1,2,3,4].map(i=>(
+          <div key={i} style={{width:6,height:6,borderRadius:'50%',background:cfg.grad,animation:`splashDot 1.2s ease-in-out ${i*0.15}s infinite`}}/>
         ))}
       </div>
-      <p style={{ color:'#334155', fontSize:11, marginTop:16, animation:'splashFadeUp 0.6s ease 1s both', letterSpacing:'0.08em' }}>
+      <p style={{color:'#334155',fontSize:11,marginTop:14,animation:'splashFadeUp 0.6s ease 1s both',letterSpacing:'0.08em'}}>
         LOADING YOUR WORKSPACE…
       </p>
       <style>{`
-        @keyframes splashFloat {
-          0%,100% { transform:translateY(0) scale(1); }
-          50%      { transform:translateY(-20px) scale(1.04); }
-        }
-        @keyframes splashPulse {
-          0%,100% { transform:scale(1);   opacity:0.4; }
-          50%      { transform:scale(1.1); opacity:0.1; }
-        }
-        @keyframes splashProgress {
-          from { stroke-dashoffset:578; }
-          to   { stroke-dashoffset:0; }
-        }
-        @keyframes splashLogoPop {
-          from { transform:scale(0) rotate(-15deg); opacity:0; }
-          to   { transform:scale(1) rotate(0deg);   opacity:1; }
-        }
-        @keyframes splashFadeUp {
-          from { opacity:0; transform:translateY(12px); }
-          to   { opacity:1; transform:translateY(0); }
-        }
-        @keyframes splashDot {
-          0%,100% { transform:translateY(0);    opacity:0.3; }
-          50%      { transform:translateY(-8px); opacity:1; }
-        }
-        @keyframes waveArm {
-          0%,100% { transform:rotate(-20deg); }
-          50%      { transform:rotate(25deg); }
-        }
-        @keyframes waveArmL {
-          0%,100% { transform:rotate(20deg); }
-          50%      { transform:rotate(-25deg); }
-        }
-        @keyframes headNod {
-          0%,100% { transform:translateY(0); }
-          50%      { transform:translateY(-3px); }
-        }
-        @keyframes crownSpark {
-          0%,100% { opacity:1; transform:scale(1); }
-          50%      { opacity:0.5; transform:scale(1.5); }
-        }
-        @keyframes glassShine {
-          0%,100% { opacity:0.3; }
-          50%      { opacity:0.9; }
-        }
-        @keyframes earGlow {
-          0%,100% { fill:#0c4a6e; }
-          50%      { fill:#22d3ee; }
-        }
-        @keyframes thumbUp {
-          0%,100% { transform:rotate(0deg); }
-          50%      { transform:rotate(-15deg); }
-        }
-        @keyframes heartFloat {
-          0%   { transform:translateY(0);     opacity:0.8; }
-          100% { transform:translateY(-30px); opacity:0; }
-        }
+        @keyframes splashFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-20px) scale(1.04)}}
+        @keyframes splashPulse{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(1.1);opacity:0.1}}
+        @keyframes splashProgress{from{stroke-dashoffset:578}to{stroke-dashoffset:0}}
+        @keyframes splashLogoPop{from{transform:scale(0) rotate(-15deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+        @keyframes splashFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes splashDot{0%,100%{transform:translateY(0);opacity:0.3}50%{transform:translateY(-8px);opacity:1}}
+        @keyframes waveArm{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(25deg)}}
+        @keyframes waveArmL{0%,100%{transform:rotate(20deg)}50%{transform:rotate(-25deg)}}
+        @keyframes headNod{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        @keyframes crownSpark{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.5)}}
+        @keyframes earGlow{0%,100%{fill:#0c4a6e}50%{fill:#22d3ee}}
+        @keyframes thumbUp{0%,100%{transform:rotate(0)}50%{transform:rotate(-15deg)}}
+        @keyframes heartFloat{0%{transform:translateY(0);opacity:0.8}100%{transform:translateY(-30px);opacity:0}}
       `}</style>
     </div>
   )
@@ -450,8 +610,8 @@ function SplashScreen({ userName, userRole }) {
 /* ─── Login Page ─────────────────────────────────────────────────────────── */
 export default function LoginPage() {
   const navigate = useNavigate()
-  const setUser = useAppStore((s) => s.setUser)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const setUser = useAppStore(s => s.setUser)
+  const [form, setForm] = useState({ email:'', password:'' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
@@ -475,109 +635,68 @@ export default function LoginPage() {
 
   return (
     <>
-      {splashUser !== null && (
-        <SplashScreen userName={splashUser} userRole={splashRole} />
-      )}
+      {splashUser !== null && <SplashScreen userName={splashUser} userRole={splashRole}/>}
 
-      <div className="min-h-screen flex" style={{ background: '#f1f5f9' }}>
+      <div className="min-h-screen flex" style={{background:'#eef2f7'}}>
 
-        {/* ── Left panel: Branding ─────────────────────────────────────────── */}
-        <div className="hidden lg:flex flex-col justify-between w-[52%] relative overflow-hidden p-10"
-             style={{ background: 'linear-gradient(160deg, #0a1628 0%, #0d2348 40%, #1a3060 100%)' }}>
+        {/* ════════════════ LEFT PANEL — Branding ════════════════ */}
+        <div className="hidden lg:flex flex-col justify-between w-[56%] relative overflow-hidden p-10"
+             style={{background:'linear-gradient(160deg,#091525 0%,#0c1e3a 45%,#0f2448 100%)'}}>
 
-          {/* Neural network background decoration */}
-          <svg className="absolute inset-0 w-full h-full" style={{ opacity:0.06 }} preserveAspectRatio="xMidYMid slice">
-            {/* Horizontal neural traces */}
-            {[15,28,42,55,68,82].map((y,i) => (
-              <line key={`h${i}`} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#1a4db8" strokeWidth="1"/>
+          {/* Circuit-grid background decoration */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:0.05}}>
+            {[12,24,36,48,60,72,84].map((y,i)=>
+              <line key={`h${i}`} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#1d6ec6" strokeWidth="1"/>
+            )}
+            {[10,22,34,46,58,70,82,94].map((x,i)=>
+              <line key={`v${i}`} x1={`${x}%`} y1="0" x2={`${x}%`} y2="100%" stroke="#1d6ec6" strokeWidth="1"/>
+            )}
+            {[12,36,60,84].map(y=>[10,34,58,82].map(x=>
+              <circle key={`n${x}${y}`} cx={`${x}%`} cy={`${y}%`} r="3" fill="#1d6ec6"/>
             ))}
-            {/* Vertical neural traces */}
-            {[12,28,45,62,78,92].map((x,i) => (
-              <line key={`v${i}`} x1={`${x}%`} y1="0" x2={`${x}%`} y2="100%" stroke="#1a4db8" strokeWidth="1"/>
-            ))}
-            {/* Synapse nodes at intersections */}
-            {[15,42,68].map(y => [12,45,78].map(x => (
-              <circle key={`n${x}${y}`} cx={`${x}%`} cy={`${y}%`} r="3" fill="#1a4db8"/>
-            )))}
           </svg>
 
-          {/* Radial glow */}
-          <div style={{
-            position:'absolute', top:'30%', left:'40%',
-            width:500, height:500, borderRadius:'50%', transform:'translate(-50%,-50%)',
-            background:'radial-gradient(circle, rgba(26,77,184,0.3) 0%, transparent 70%)',
+          {/* Radial glows */}
+          <div style={{position:'absolute',top:'28%',left:'35%',width:520,height:520,borderRadius:'50%',
+            transform:'translate(-50%,-50%)',pointerEvents:'none',
+            background:'radial-gradient(circle,rgba(29,110,198,0.22) 0%,transparent 68%)'}}/>
+          <div style={{position:'absolute',bottom:'6%',right:'-4%',width:280,height:280,borderRadius:'50%',
             pointerEvents:'none',
-          }}/>
-          <div style={{
-            position:'absolute', bottom:'10%', right:'-5%',
-            width:300, height:300, borderRadius:'50%',
-            background:'radial-gradient(circle, rgba(232,87,26,0.15) 0%, transparent 70%)',
-            pointerEvents:'none',
-          }}/>
+            background:'radial-gradient(circle,rgba(232,93,26,0.12) 0%,transparent 70%)'}}/>
 
-          {/* Top: Connectome company branding */}
+          {/* ── Top: Connectome company logo ── */}
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
-              <ConnectomeLogo size={48} />
-              <div>
-                <div style={{ color:'#94a3b8', fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', marginBottom:2 }}>Powered by</div>
-                <div style={{ color:'#fff', fontSize:18, fontWeight:700, letterSpacing:'-0.01em' }}>Connectome</div>
-              </div>
-            </div>
+            <ConnectomeLogo width={380} height={112}/>
           </div>
 
-          {/* Center: Axon product branding */}
+          {/* ── Centre: Axon product logo ── */}
           <div className="relative z-10 flex flex-col items-start">
-            <div className="flex items-center gap-4 mb-5">
-              <AxonLogo size={72} />
-              <div>
-                <h1 style={{ fontSize:52, fontWeight:900, color:'#fff', letterSpacing:'-0.04em', lineHeight:1, margin:0 }}>
-                  Axon
-                </h1>
-                <div style={{ fontSize:13, color:'#e8571a', fontWeight:600, letterSpacing:'0.05em', marginTop:4 }}>
-                  REQUIREMENT &amp; TRACKING SYSTEM
-                </div>
-              </div>
-            </div>
-            <p style={{ color:'#64748b', fontSize:14, lineHeight:1.7, maxWidth:360, margin:0 }}>
+            <AxonLogoFull width={440} height={293}/>
+            <p style={{color:'#4a6080',fontSize:13,lineHeight:1.75,maxWidth:400,margin:'16px 0 0'}}>
               Manage milestones, assignments, and project timelines in one intelligent workspace — built for cross-functional teams.
             </p>
-
-            {/* Feature badges */}
-            <div className="flex flex-wrap gap-2 mt-8">
-              {['Milestone Tracking','Team Workload','Financial Reports','Smart Assignments'].map(f => (
-                <span key={f} style={{
-                  display:'inline-flex', alignItems:'center', gap:5,
-                  background:'rgba(26,77,184,0.2)', border:'1px solid rgba(26,77,184,0.4)',
-                  color:'#93c5fd', fontSize:11, padding:'4px 10px', borderRadius:20, fontWeight:500,
-                }}>
-                  <span style={{ width:5, height:5, borderRadius:'50%', background:'#e8571a', display:'inline-block' }}/>
-                  {f}
-                </span>
-              ))}
-            </div>
           </div>
 
-          {/* Bottom: tagline */}
+          {/* ── Bottom: copyright ── */}
           <div className="relative z-10">
-            <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:20 }}>
-              <p style={{ color:'#334155', fontSize:11, letterSpacing:'0.1em', textTransform:'uppercase', margin:0 }}>
+            <div style={{borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:18}}>
+              <p style={{color:'#253040',fontSize:11,letterSpacing:'0.08em',textTransform:'uppercase',margin:0}}>
                 Connectome &copy; {new Date().getFullYear()} &nbsp;·&nbsp; All rights reserved
               </p>
             </div>
           </div>
         </div>
 
-        {/* ── Right panel: Login form ─────────────────────────────────────── */}
+        {/* ════════════════ RIGHT PANEL — Login form ════════════════ */}
         <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12">
 
-          {/* Mobile: Axon logo */}
+          {/* Mobile only: Axon icon + name */}
           <div className="flex lg:hidden flex-col items-center mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <AxonLogo size={44} />
+            <div className="flex items-center gap-3 mb-1">
+              <AxonIcon size={42}/>
               <div>
-                <h1 style={{ fontSize:28, fontWeight:900, color:'#0f172a', letterSpacing:'-0.03em', margin:0 }}>Axon</h1>
-                <div style={{ fontSize:10, color:'#e8571a', fontWeight:600, letterSpacing:'0.08em' }}>by Connectome</div>
+                <div style={{fontSize:26,fontWeight:900,color:'#0f172a',letterSpacing:1}}>AXON</div>
+                <div style={{fontSize:10,color:'#e85d1a',fontWeight:700,letterSpacing:'0.08em'}}>by Connectome</div>
               </div>
             </div>
           </div>
@@ -585,116 +704,88 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             {/* Header */}
             <div className="mb-8">
-              <h2 style={{ fontSize:26, fontWeight:800, color:'#0f172a', letterSpacing:'-0.02em', margin:'0 0 6px' }}>
+              <h2 style={{fontSize:26,fontWeight:800,color:'#0f172a',letterSpacing:'-0.02em',margin:'0 0 6px'}}>
                 Welcome back
               </h2>
-              <p style={{ color:'#64748b', fontSize:14, margin:0 }}>
-                Sign in to your Axon workspace
-              </p>
+              <p style={{color:'#64748b',fontSize:14,margin:0}}>Sign in to your Axon workspace</p>
             </div>
 
             {/* Form card */}
-            <div style={{
-              background:'#fff', borderRadius:20, padding:28,
-              boxShadow:'0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
-              border:'1px solid #e2e8f0',
-            }}>
+            <div style={{background:'#fff',borderRadius:20,padding:28,
+              boxShadow:'0 4px 24px rgba(0,0,0,0.08),0 1px 4px rgba(0,0,0,0.04)',
+              border:'1px solid #e2e8f0'}}>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email */}
                 <div>
-                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+                  <label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:6}}>
                     Email address
                   </label>
-                  <div style={{ position:'relative' }}>
-                    <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#9ca3af', fontSize:14 }}>✉</span>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'#9ca3af',fontSize:14}}>✉</span>
                     <input
-                      style={{
-                        width:'100%', height:44, paddingLeft:34, paddingRight:14,
-                        borderRadius:10, border:'1.5px solid #e2e8f0',
-                        background:'#f8fafc', color:'#0f172a', fontSize:14,
-                        outline:'none', transition:'border-color 0.15s, box-shadow 0.15s',
-                        boxSizing:'border-box',
-                      }}
-                      onFocus={e => { e.target.style.borderColor='#1a4db8'; e.target.style.boxShadow='0 0 0 3px rgba(26,77,184,0.12)' }}
-                      onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none' }}
+                      style={{width:'100%',height:44,paddingLeft:34,paddingRight:14,borderRadius:10,
+                        border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#0f172a',fontSize:14,
+                        outline:'none',boxSizing:'border-box',transition:'border-color 0.15s,box-shadow 0.15s'}}
+                      onFocus={e=>{e.target.style.borderColor='#1d6ec6';e.target.style.boxShadow='0 0 0 3px rgba(29,110,198,0.14)'}}
+                      onBlur={e=>{e.target.style.borderColor='#e2e8f0';e.target.style.boxShadow='none'}}
                       type="email" placeholder="you@company.com"
-                      value={form.email} onChange={e => setForm({...form, email: e.target.value})} required
+                      value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required
                     />
                   </div>
                 </div>
-
+                {/* Password */}
                 <div>
-                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+                  <label style={{display:'block',fontSize:12,fontWeight:600,color:'#374151',marginBottom:6}}>
                     Password
                   </label>
-                  <div style={{ position:'relative' }}>
-                    <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#9ca3af', fontSize:14 }}>🔐</span>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'#9ca3af',fontSize:14}}>🔐</span>
                     <input
-                      style={{
-                        width:'100%', height:44, paddingLeft:34, paddingRight:44,
-                        borderRadius:10, border:'1.5px solid #e2e8f0',
-                        background:'#f8fafc', color:'#0f172a', fontSize:14,
-                        outline:'none', transition:'border-color 0.15s, box-shadow 0.15s',
-                        boxSizing:'border-box',
-                      }}
-                      onFocus={e => { e.target.style.borderColor='#1a4db8'; e.target.style.boxShadow='0 0 0 3px rgba(26,77,184,0.12)' }}
-                      onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none' }}
-                      type={showPass ? 'text' : 'password'} placeholder="••••••••"
-                      value={form.password} onChange={e => setForm({...form, password: e.target.value})} required
+                      style={{width:'100%',height:44,paddingLeft:34,paddingRight:44,borderRadius:10,
+                        border:'1.5px solid #e2e8f0',background:'#f8fafc',color:'#0f172a',fontSize:14,
+                        outline:'none',boxSizing:'border-box',transition:'border-color 0.15s,box-shadow 0.15s'}}
+                      onFocus={e=>{e.target.style.borderColor='#1d6ec6';e.target.style.boxShadow='0 0 0 3px rgba(29,110,198,0.14)'}}
+                      onBlur={e=>{e.target.style.borderColor='#e2e8f0';e.target.style.boxShadow='none'}}
+                      type={showPass?'text':'password'} placeholder="••••••••"
+                      value={form.password} onChange={e=>setForm({...form,password:e.target.value})} required
                     />
-                    <button type="button" onClick={() => setShowPass(s => !s)}
-                      style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#9ca3af', fontSize:13, padding:0 }}>
-                      {showPass ? '🙈' : '👁️'}
+                    <button type="button" onClick={()=>setShowPass(s=>!s)}
+                      style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',
+                        background:'none',border:'none',cursor:'pointer',color:'#9ca3af',fontSize:13,padding:0}}>
+                      {showPass?'🙈':'👁️'}
                     </button>
                   </div>
                 </div>
 
                 {error && (
-                  <div style={{
-                    display:'flex', alignItems:'center', gap:8, fontSize:12,
-                    color:'#dc2626', background:'#fef2f2', border:'1px solid #fecaca',
-                    padding:'10px 12px', borderRadius:10,
-                  }}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#dc2626',
+                    background:'#fef2f2',border:'1px solid #fecaca',padding:'10px 12px',borderRadius:10}}>
                     <span>⚠️</span> {error}
                   </div>
                 )}
 
-                <button type="submit" disabled={loading || splashUser !== null}
-                  style={{
-                    width:'100%', height:46, borderRadius:10, border:'none', cursor:'pointer',
-                    background: 'linear-gradient(135deg, #1a4db8, #0d2e73)',
-                    color:'#fff', fontSize:15, fontWeight:700, letterSpacing:'-0.01em',
-                    boxShadow:'0 4px 16px rgba(26,77,184,0.35)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                    transition:'opacity 0.15s, transform 0.1s',
-                    opacity: (loading || splashUser !== null) ? 0.6 : 1,
-                    marginTop:8,
-                  }}
-                  onMouseEnter={e => { if(!loading && splashUser===null) e.target.style.opacity='0.92' }}
-                  onMouseLeave={e => { e.target.style.opacity='1' }}
-                >
+                <button type="submit" disabled={loading||splashUser!==null}
+                  style={{width:'100%',height:46,borderRadius:10,border:'none',cursor:'pointer',
+                    background:'linear-gradient(135deg,#1d6ec6,#0d3e7a)',color:'#fff',
+                    fontSize:15,fontWeight:700,letterSpacing:'0.01em',
+                    boxShadow:'0 4px 16px rgba(29,110,198,0.38)',
+                    display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:8,
+                    opacity:(loading||splashUser!==null)?0.6:1,transition:'opacity 0.15s'}}>
                   {loading
-                    ? <><span style={{ display:'inline-block', animation:'spin 0.8s linear infinite' }}>⟳</span> Signing in…</>
-                    : 'Sign in to Axon'
-                  }
+                    ? <><span style={{display:'inline-block',animation:'spin 0.8s linear infinite'}}>⟳</span> Signing in…</>
+                    : 'Sign in to Axon'}
                 </button>
               </form>
             </div>
 
-            <p style={{ textAlign:'center', fontSize:11, color:'#cbd5e1', marginTop:20, letterSpacing:'0.04em' }}>
-              🔒 Secure login &nbsp;·&nbsp; Your data is protected by Connectome
+            <p style={{textAlign:'center',fontSize:11,color:'#cbd5e1',marginTop:20,letterSpacing:'0.04em'}}>
+              🔒 Secure login &nbsp;·&nbsp; Protected by Connectome
             </p>
           </div>
         </div>
 
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform:rotate(360deg); } }
-        @keyframes float {
-          0%,100% { transform:translateY(0); }
-          50%      { transform:translateY(-6px); }
-        }
-      `}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </>
   )
 }
