@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { getProjectsList, getUsersList } from '../../utils/masterData'
@@ -65,8 +65,19 @@ export default function GlobalDashboard() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [filters])
-  const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [filters])
+  const setFilter = (k, v) => {
+    if (k === 'date_from') {
+      setFilters(f => ({...f, date_from: v, ...(v && f.date_to && v > f.date_to ? {date_to: v} : {})}))
+    } else {
+      setFilters(f => ({...f, [k]: v}))
+    }
+  }
 
   const now = new Date()
   const totalAssigned  = assignments.length
@@ -168,7 +179,7 @@ export default function GlobalDashboard() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">📅 To</label>
-              <input type="date" className="input text-xs h-8" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)} />
+              <input type="date" className="input text-xs h-8" value={filters.date_to} min={filters.date_from || undefined} onChange={e => setFilter('date_to', e.target.value)} />
             </div>
             <div className="flex items-end">
               <button onClick={() => setFilters({team:'',project_id:'',employee_id:'',date_from:daysAgo(30),date_to:today()})}

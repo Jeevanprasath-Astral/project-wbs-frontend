@@ -334,7 +334,7 @@ export default function ProjectsPage() {
       {/* Edit Project Modal */}
       {editProject && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
@@ -346,7 +346,7 @@ export default function ProjectsPage() {
               </div>
               <button onClick={() => setEditProject(null)} className="text-gray-400 hover:text-gray-600 text-lg">\u2715</button>
             </div>
-            <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="p-5 space-y-3 flex-1 overflow-y-auto">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Project Name</label>

@@ -175,7 +175,7 @@ export function TimelinePage() {
                 <td className="px-3 py-2 font-medium text-gray-700 truncate">{ms.name}</td>
                 <td className="px-3 py-2 text-gray-500 truncate">{ms.assignee || '—'}</td>
                 <td className="px-3 py-1.5"><input type="date" className="input text-xs h-7 px-2" defaultValue={ms.planned_start || ''} onBlur={e=>update(ms.id,'planned_start',e.target.value)} /></td>
-                <td className="px-3 py-1.5"><input type="date" className="input text-xs h-7 px-2" defaultValue={ms.planned_end || ''} onBlur={e=>update(ms.id,'planned_end',e.target.value)} /></td>
+                <td className="px-3 py-1.5"><input type="date" className="input text-xs h-7 px-2" defaultValue={ms.planned_end || ''} onBlur={e=>{const v=e.target.value;if(ms.planned_start&&v&&v<ms.planned_start){alert('End date cannot be before start date');e.target.value=ms.planned_end||'';return;}update(ms.id,'planned_end',v)}} /></td>
                 <td className="px-3 py-2 text-gray-400">{fmtDate(ms.actual_start) || '—'}</td>
                 <td className="px-3 py-2 text-gray-400">{fmtDate(ms.actual_end) || '—'}</td>
                 <td className="px-3 py-2"><span className={`badge-${ms.status==='Completed'?'done':ms.status==='In Progress'?'prog':ms.status==='Overdue'?'over':'todo'}`}>{ms.status}</span></td>

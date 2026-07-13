@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fmtDate } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -45,7 +45,12 @@ export default function GlobalDeadlines() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [filters])
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [filters])
   const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
 
   const urgent   = deadlines.filter(d => d.days_remaining <= 2)

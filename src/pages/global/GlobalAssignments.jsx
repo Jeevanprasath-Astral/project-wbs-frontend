@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fmtDate } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -126,7 +126,12 @@ export default function GlobalAssignments() {
   const totalPages = Math.max(1, Math.ceil(tabAssignments.length / PAGE_SIZE))
   const pagedAssignments = tabAssignments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  useEffect(() => { load() }, [filters])
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [filters])
   useEffect(() => { setPage(1) }, [filters, activeTab])
   useEffect(() => { loadCategories() }, [])
 
@@ -438,12 +443,12 @@ export default function GlobalAssignments() {
       {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2"><span className="text-xl">📌</span><h2 className="text-sm font-semibold">Assign new task</h2></div>
               <button onClick={() => setShowModal(false)} className="text-gray-300 hover:text-gray-500 text-xl">✕</button>
             </div>
-            <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="p-5 space-y-3 flex-1 overflow-y-auto">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">🏢 Project</label>
                 <select className="select text-sm" value={form.project_id} onChange={e => setForm({...form, project_id: e.target.value})}>

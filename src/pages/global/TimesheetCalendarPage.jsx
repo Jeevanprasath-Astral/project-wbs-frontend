@@ -543,7 +543,7 @@ export default function TimesheetCalendarPage() {
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">To</label>
-                <input type="date" className="input text-xs h-8" value={newLeave.date_to} onChange={e=>setNewLeave({...newLeave,date_to:e.target.value})} />
+                <input type="date" className="input text-xs h-8" value={newLeave.date_to} min={newLeave.date_from || undefined} onChange={e=>{if(newLeave.date_from&&e.target.value<newLeave.date_from)return;setNewLeave({...newLeave,date_to:e.target.value})}} />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Type</label>
@@ -749,11 +749,15 @@ export default function TimesheetCalendarPage() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">📅 Start Date</label>
                   <input type="date" className="input text-xs h-8" value={trackerFilters.start_date}
-                    onChange={e => setTrackerFilters(f => ({...f, start_date: e.target.value}))} />
+                    onChange={e => {
+                      const v = e.target.value
+                      setTrackerFilters(f => ({...f, start_date: v, ...(v && f.end_date && v > f.end_date ? {end_date: v} : {})}))
+                    }} />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">📅 End Date</label>
                   <input type="date" className="input text-xs h-8" value={trackerFilters.end_date}
+                    min={trackerFilters.start_date || undefined}
                     onChange={e => setTrackerFilters(f => ({...f, end_date: e.target.value}))} />
                 </div>
               </div>
@@ -1285,7 +1289,7 @@ export default function TimesheetCalendarPage() {
       {/* Manual timesheet entry modal */}
       {entryDay && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🗓️</span>

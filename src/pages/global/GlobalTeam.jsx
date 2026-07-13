@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fmtDate } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -99,7 +99,12 @@ export default function GlobalTeam() {
     finally { setSavingRole(false) }
   }
 
-  useEffect(() => { load() }, [filterRole, filterStatus, filterTeam, filterProject])
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [filterRole, filterStatus, filterTeam, filterProject])
   useEffect(() => { loadCustomRoles() }, [])
 
   const showMsg = (text, type='success') => { setMsg({text,type}); setTimeout(()=>setMsg(null),3000) }
@@ -394,7 +399,7 @@ export default function GlobalTeam() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-fade-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="text-xl">👥</span>

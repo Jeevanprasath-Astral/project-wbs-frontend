@@ -68,8 +68,8 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
     } catch { setError('Delete failed') }
   }
 
-  const downloadUrl = (a) =>
-    `/api/uploads/attachments/${entityType}/${a.stored_filename}`
+  // URL comes directly from Cloudinary (returned by the backend)
+  const downloadUrl = (a) => a.url || '#'
 
   const count = attachments.length
 

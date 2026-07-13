@@ -276,12 +276,12 @@ export default function CostManagementPage() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-fade-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2"><span className="text-xl">💰</span><h2 className="text-sm font-semibold">{editingId ? 'Edit cost entry' : 'Add cost entry'}</h2></div>
               <button onClick={() => setShowModal(false)} className="text-gray-300 hover:text-gray-500 text-xl">✕</button>
             </div>
-            <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="p-5 space-y-3 flex-1 overflow-y-auto">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">📅 Date <span className="text-rose-500">*</span></label>
                 <input type="date" className="input text-sm" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />

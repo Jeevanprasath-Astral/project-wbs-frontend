@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { getProjectsList, getUsersList } from '../../utils/masterData'
@@ -45,8 +45,19 @@ export default function GlobalWorkload() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [filters])
-  const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [filters])
+  const setFilter = (k, v) => {
+    if (k === 'date_from') {
+      setFilters(f => ({...f, date_from: v, ...(v && f.date_to && v > f.date_to ? {date_to: v} : {})}))
+    } else {
+      setFilters(f => ({...f, [k]: v}))
+    }
+  }
 
   const COLORS = { assigned:'#7c3aed', completed:'#10b981', in_progress:'#f59e0b', pending:'#94a3b8', on_hold:'#0ea5e9', overdue:'#ef4444' }
 
@@ -143,7 +154,7 @@ export default function GlobalWorkload() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">📅 To</label>
-              <input type="date" className="input text-xs h-8" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)} />
+              <input type="date" className="input text-xs h-8" value={filters.date_to} min={filters.date_from || undefined} onChange={e => setFilter('date_to', e.target.value)} />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">📈 Chart type</label>

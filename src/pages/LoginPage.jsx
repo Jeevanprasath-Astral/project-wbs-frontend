@@ -16,6 +16,107 @@ const SKIN = '#F5CBA7'
 ────────────────────────────────────────────────────────────────────────────── */
 
 
+
+/* ─── Neural Signal Path — animated conduit between Connectome and Axon ───── */
+function NeuralSignalPath() {
+  return (
+    <div style={{position:'relative',height:210,width:420,pointerEvents:'none',marginTop:18,marginLeft:4}}>
+      <svg width="420" height="210" style={{overflow:'visible'}}>
+        <defs>
+          {/* Conduit gradient: Connectome blue → Axon orange */}
+          <linearGradient id="nspLine" x1="24" y1="0" x2="24" y2="210" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#1d6ec6" stopOpacity="0.85"/>
+            <stop offset="50%"  stopColor="#2a7fd4" stopOpacity="0.55"/>
+            <stop offset="100%" stopColor="#e85d1a" stopOpacity="0.85"/>
+          </linearGradient>
+          {/* Pulse glow */}
+          <filter id="nspPulse" x="-400%" y="-400%" width="900%" height="900%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          {/* Node glow */}
+          <filter id="nspNode" x="-300%" y="-300%" width="700%" height="700%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        {/* ── Conduit line ── */}
+        <line x1="24" y1="0" x2="24" y2="210" stroke="url(#nspLine)" strokeWidth="1.5"/>
+
+        {/* ── Synaptic node (midpoint) ── */}
+        <circle cx="24" cy="105" r="12" fill="none" stroke="#1d6ec6" strokeWidth="0.8" opacity="0.25">
+          <animate attributeName="r"       values="12;22;12" dur="3.2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.25;0.04;0.25" dur="3.2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="24" cy="105" r="6" fill="none" stroke="#1d6ec6" strokeWidth="1" opacity="0.45">
+          <animate attributeName="r"       values="6;10;6" dur="3.2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.45;0.15;0.45" dur="3.2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="24" cy="105" r="3.5" fill="#1e6de8" opacity="0.92" filter="url(#nspNode)"/>
+        <circle cx="24" cy="105" r="1.6" fill="#aaddff" opacity="1"/>
+
+        {/* ── Signal pulses ── */}
+        {/* Pulse 1 – primary */}
+        <circle cx="24" r="4" filter="url(#nspPulse)">
+          <animate attributeName="cy"   from="-10" to="220" dur="2.6s" begin="0s"    repeatCount="indefinite"/>
+          <animate attributeName="fill" values="#4aaeff;#4aaeff;#cc6020;#e85d1a"
+                   keyTimes="0;0.45;0.85;1" dur="2.6s" begin="0s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;1;1;0"
+                   keyTimes="0;0.08;0.88;1" dur="2.6s" begin="0s" repeatCount="indefinite"/>
+        </circle>
+        {/* Pulse 2 – secondary */}
+        <circle cx="24" r="2.5">
+          <animate attributeName="cy"   from="-10" to="220" dur="2.6s" begin="0.9s"  repeatCount="indefinite"/>
+          <animate attributeName="fill" values="#88ccff;#88ccff;#ff9944"
+                   keyTimes="0;0.5;1" dur="2.6s" begin="0.9s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;0.7;0.7;0"
+                   keyTimes="0;0.08;0.88;1" dur="2.6s" begin="0.9s" repeatCount="indefinite"/>
+        </circle>
+        {/* Pulse 3 – ghost trail */}
+        <circle cx="24" r="1.5" fill="#cceeff">
+          <animate attributeName="cy"   from="-10" to="220" dur="2.6s" begin="1.7s"  repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;0.35;0.35;0"
+                   keyTimes="0;0.08;0.88;1" dur="2.6s" begin="1.7s" repeatCount="indefinite"/>
+        </circle>
+
+        {/* ── Ghost tech labels (cycle in/out sequentially) ── */}
+        {/* Label 1 — ARTIFICIAL INTELLIGENCE */}
+        <g>
+          <animate attributeName="opacity"
+                   values="0;0;0.6;0.6;0;0" keyTimes="0;0.1;0.2;0.4;0.5;1"
+                   dur="8s" begin="0s" repeatCount="indefinite"/>
+          <line x1="28" y1="45" x2="56" y2="45" stroke="#1d6ec6" strokeWidth="0.8" strokeOpacity="0.7"/>
+          <circle cx="56" cy="45" r="2" fill="#1d6ec6" opacity="0.8"/>
+          <text x="62" y="49.5" fontSize="8.5" fill="#1d6ec6" opacity="0.85"
+                fontFamily="'Courier New',Courier,monospace" letterSpacing="2.5">ARTIFICIAL INTELLIGENCE</text>
+        </g>
+        {/* Label 2 — DATA FLOW */}
+        <g>
+          <animate attributeName="opacity"
+                   values="0;0;0;0.6;0.6;0;0" keyTimes="0;0.25;0.3;0.45;0.6;0.7;1"
+                   dur="8s" begin="0s" repeatCount="indefinite"/>
+          <line x1="28" y1="105" x2="56" y2="105" stroke="#3388dd" strokeWidth="0.8" strokeOpacity="0.7"/>
+          <circle cx="56" cy="105" r="2" fill="#3388dd" opacity="0.8"/>
+          <text x="62" y="109.5" fontSize="8.5" fill="#3388dd" opacity="0.8"
+                fontFamily="'Courier New',Courier,monospace" letterSpacing="2.5">DATA FLOW</text>
+        </g>
+        {/* Label 3 — AUTOMATION */}
+        <g>
+          <animate attributeName="opacity"
+                   values="0;0;0;0;0.6;0.6;0" keyTimes="0;0.45;0.5;0.58;0.7;0.85;1"
+                   dur="8s" begin="0s" repeatCount="indefinite"/>
+          <line x1="28" y1="165" x2="56" y2="165" stroke="#cc5500" strokeWidth="0.8" strokeOpacity="0.7"/>
+          <circle cx="56" cy="165" r="2" fill="#e85d1a" opacity="0.8"/>
+          <text x="62" y="169.5" fontSize="8.5" fill="#cc5500" opacity="0.75"
+                fontFamily="'Courier New',Courier,monospace" letterSpacing="2.5">AUTOMATION</text>
+        </g>
+
+      </svg>
+    </div>
+  )
+}
+
 /* ─── Role Avatar Components (unchanged) ─────────────────────────────────── */
 function AdminAvatar() {
   return (
@@ -369,9 +470,10 @@ export default function LoginPage() {
             pointerEvents:'none',
             background:'radial-gradient(circle,rgba(232,93,26,0.12) 0%,transparent 70%)'}}/>
 
-          {/* ── Top: Connectome company logo ── */}
-          <div className="relative z-10">
+          {/* ── Top: Connectome logo + Neural Signal Path ── */}
+          <div className="relative z-10 flex flex-col">
             <img src={connectomeLogo} alt="Connectome" style={{width:380,objectFit:"contain"}}/>
+            <NeuralSignalPath />
           </div>
 
           {/* ── Centre: Axon product logo ── */}

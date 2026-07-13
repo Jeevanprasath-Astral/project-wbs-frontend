@@ -66,8 +66,19 @@ export default function WorkingHours() {
     finally { if (mySeq === loadSeq.current) setLoading(false) }
   }
 
-  useEffect(() => { load() }, [projectId, filters])
-  const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
+  const _loadTimer = useRef(null)
+  useEffect(() => {
+    clearTimeout(_loadTimer.current)
+    _loadTimer.current = setTimeout(load, 300)
+    return () => clearTimeout(_loadTimer.current)
+  }, [projectId, filters])
+  const setFilter = (k, v) => {
+    if (k === 'date_from') {
+      setFilters(f => ({...f, date_from: v, ...(v && f.date_to && v > f.date_to ? {date_to: v} : {})}))
+    } else {
+      setFilters(f => ({...f, [k]: v}))
+    }
+  }
   const showMsg = (text, type='success') => { setMsg({text,type}); setTimeout(()=>setMsg(null),3000) }
 
   const selMilestone = cmMilestones.find(m => String(m.id) === String(form.custom_milestone_id))
@@ -257,7 +268,7 @@ export default function WorkingHours() {
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">📅 To</label>
-            <input type="date" className="input text-xs h-8" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)} />
+            <input type="date" className="input text-xs h-8" value={filters.date_to} min={filters.date_from || undefined} onChange={e => setFilter('date_to', e.target.value)} />
           </div>
           <div className="flex items-end gap-1">
             {[{l:'7d',n:7},{l:'30d',n:30},{l:'3M',n:90}].map(r => (
