@@ -559,9 +559,9 @@ export default function LoginPage() {
                 </div>
 
                 {/* Forgot password link */}
-                <div style={{textAlign:'right',marginTop:-8}}>
+                <div style={{textAlign:'right',marginTop:6}}>
                   <Link to="/forgot-password"
-                    style={{fontSize:12,color:'#1d6ec6',textDecoration:'none',fontWeight:500}}>
+                    style={{fontSize:13,color:'#1d6ec6',textDecoration:'none',fontWeight:600}}>
                     Forgot password?
                   </Link>
                 </div>
