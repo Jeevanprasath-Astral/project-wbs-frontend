@@ -6,6 +6,8 @@ import { useAppStore } from './store'
 // code-split via React.lazy so its JS chunk is only fetched when that route
 // is opened — cuts the initial bundle and first-load time significantly.
 import LoginPage          from './pages/LoginPage'
+import ForgotPassword     from './pages/ForgotPassword'
+import ResetPassword      from './pages/ResetPassword'
 import HomePage           from './pages/HomePage'
 import AppLayout          from './layouts/AppLayout'
 import GlobalLayout       from './layouts/GlobalLayout'
@@ -57,7 +59,9 @@ export default function App() {
     <BrowserRouter>
       <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login"           element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
         <Route path="/projects/new" element={<ProtectedRoute><ProjectSetup /></ProtectedRoute>} />

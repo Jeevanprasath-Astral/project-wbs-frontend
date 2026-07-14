@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAppStore } from '../store'
 import api from '../utils/api'
 import connectomeLogo from '../assets/connectome-logo.png'
@@ -556,6 +556,14 @@ export default function LoginPage() {
                       {showPass?'🙈':'👁️'}
                     </button>
                   </div>
+                </div>
+
+                {/* Forgot password link */}
+                <div style={{textAlign:'right',marginTop:-8}}>
+                  <Link to="/forgot-password"
+                    style={{fontSize:12,color:'#1d6ec6',textDecoration:'none',fontWeight:500}}>
+                    Forgot password?
+                  </Link>
                 </div>
 
                 {error && (
