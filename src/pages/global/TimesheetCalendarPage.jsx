@@ -249,7 +249,7 @@ export default function TimesheetCalendarPage() {
   ]
   const REPORT_FIELDS = {
     individual_time: [['start_date','Start Date'], ['end_date','End Date'], ['project','Project'], ['billable','Billable / Non-Billable'], ['hours','Number of Hours']],
-    leave: [['employee','Employee Name'], ['leave_reason','Leave Reason'], ['start_date','Start Date'], ['end_date','End Date']],
+    leave: [['employee','Employee Name'], ['leave_reason','Leave Reason'], ['leave_start_date','Leave Start Date'], ['leave_end_date','Leave End Date'], ['leave_days','Leave Days']],
     overtime: [['employee','Employee Name'], ['start_date','Start Date'], ['end_date','End Date'], ['hours_worked','Hours Worked'], ['overtime_hours','Overtime Hours']],
     holiday: [['start_date','Start Date'], ['end_date','End Date'], ['holiday_name','Holiday Name']],
     permission: [['employee','Employee Name'], ['start_date','Start Date'], ['end_date','End Date'], ['hours','Hours'], ['permission_reason','Permission Reason']],

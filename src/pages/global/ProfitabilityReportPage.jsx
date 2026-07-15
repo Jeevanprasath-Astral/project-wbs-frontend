@@ -77,7 +77,7 @@ export default function ProfitabilityReportPage() {
     { icon: '🏢', label: 'Indirect / Overhead', desc: 'Overhead allocated to this project' },
     { icon: '📊', label: 'Net Profit / Loss', desc: 'Billing − Total Cost (green = profit, red = loss)' },
     { icon: '📈', label: 'Net Margin %', desc: 'Profit ÷ Billing × 100' },
-    { icon: '🔄', label: 'Billing Recovery %', desc: 'Billing ÷ Total Cost × 100 (>100% = profitable)' },
+    { icon: '🔄', label: 'Labor Yield %', desc: '(Billing − Direct Expenses) ÷ Manpower Cost × 100' },
     { icon: '⏱️', label: 'Utilization %', desc: 'Billable Hours ÷ Total Hours × 100' },
   ]
 

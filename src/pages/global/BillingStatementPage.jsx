@@ -118,8 +118,9 @@ export default function BillingStatementPage() {
         <div className="bg-violet-50 border border-violet-100 rounded-2xl px-5 py-3 text-xs text-violet-800 leading-relaxed">
           <span className="font-semibold">What this report shows:</span>{' '}
           A complete billing history for each project — every billing entry with its date, type, amount, and a cumulative running total.
-          The Excel export has two sheets — <strong>Summary</strong> (one row per project with totals and types used) and{' '}
-          <strong>All Entries</strong> (every individual billing entry with a running total that resets per project).
+          The Excel export has three sheets — <strong>Summary</strong> (one row per project with totals and types used),{' '}
+          <strong>All Entries</strong> (every individual billing entry with a running total that resets per project), and{' '}
+          <strong>Month-wise Summary</strong> (total billed per calendar month with project breakdown).
           Billing entries are managed in <strong>Financial Settings → Project Billing History</strong>.
         </div>
 
