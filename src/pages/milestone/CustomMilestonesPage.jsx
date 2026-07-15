@@ -516,6 +516,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
   const [draft, setDraft] = useState(t)
   const [showTplSubs, setShowTplSubs] = useState(false)
   const [tplSubs, setTplSubs] = useState(null)
+  const [showTaskMailbox, setShowTaskMailbox] = useState(false)
   // Time Management is collapsed behind an icon on the Task row itself —
   // same pattern as the 📅 toggle on Subtask rows — instead of always
   // rendering inline, which took up space whenever a Task was opened.
@@ -567,6 +568,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
           <button onClick={()=>setShowTimeline(v=>!v)}
             className={clsx('btn text-xs py-0.5 px-1.5 hover:text-violet-600 hover:border-violet-200', showTimeline && 'text-violet-600 border-violet-200 bg-violet-50')}
             title="Time Management">📅</button>
+          <button onClick={()=>setShowTaskMailbox(true)} className="btn text-xs py-0.5 px-1.5 hover:text-blue-600" title="Send task details by email">✉️</button>
           <button onClick={delTask} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
         </div>
         <span className="text-gray-300 text-xs">{isOpen?'▲':'▼'}</span>
@@ -624,6 +626,13 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
 
           <AttachmentPanel entityType="task" entityId={t.id} />
         </div>
+      )}
+      {showTaskMailbox && (
+        <MailboxModal
+          type="task" projectId={projectId} entityId={t.id} msId={ms.id}
+          entityName={`T${String(t.num).padStart(2,'0')} — ${t.name}`}
+          team={team} onClose={() => setShowTaskMailbox(false)}
+        />
       )}
     </div>
   )
@@ -698,6 +707,100 @@ function RevisitModal({ ms, projectId, onClose, onDone }) {
   )
 }
 
+// ── Mailbox modal — send milestone or task details as email + Excel attachment ─
+function MailboxModal({ projectId, type, entityId, msId, entityName, team, onClose }) {
+  const [toEmails, setToEmails] = useState([])
+  const [externalEmail, setExternalEmail] = useState('')
+  const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  const allRecipients = [
+    ...toEmails,
+    ...externalEmail.split(',').map(e => e.trim()).filter(Boolean)
+  ]
+
+  const send = async () => {
+    if (allRecipients.length === 0) { setError('Add at least one recipient.'); return }
+    setError(''); setSending(true)
+    try {
+      const url = type === 'milestone'
+        ? `/projects/${projectId}/custom-milestones/${entityId}/mailbox`
+        : `/projects/${projectId}/custom-milestones/${msId}/tasks/${entityId}/mailbox`
+      await api.post(url, { to: allRecipients, note })
+      setSent(true)
+      setTimeout(() => onClose(), 1800)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to send email — check logs')
+    } finally { setSending(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">✉️</span>
+            <div>
+              <h2 className="text-sm font-semibold">Send {type === 'milestone' ? 'Milestone' : 'Task'} Details</h2>
+              <p className="text-xs text-gray-400">{entityName} · Excel attached</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl">✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Team member checkboxes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">To — Team Members</label>
+            <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-xl p-2 space-y-0.5 bg-gray-50">
+              {(team || []).filter(m => m.email).map(m => (
+                <label key={m.id} className="flex items-center gap-2 cursor-pointer hover:bg-white rounded-lg px-2 py-1 transition-colors">
+                  <input type="checkbox" className="accent-violet-600"
+                    checked={toEmails.includes(m.email)}
+                    onChange={e => setToEmails(prev => e.target.checked ? [...prev, m.email] : prev.filter(x => x !== m.email))} />
+                  <span className="text-xs font-medium text-gray-700">{m.name}</span>
+                  <span className="text-xs text-gray-400">{m.email}</span>
+                </label>
+              ))}
+              {!(team || []).some(m => m.email) && <p className="text-xs text-gray-400 px-2 py-1">No team members with email addresses found.</p>}
+            </div>
+          </div>
+          {/* External emails */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">External Email <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+            <input className="input text-sm w-full" placeholder="e.g. client@company.com, manager@firm.com"
+              value={externalEmail} onChange={e => setExternalEmail(e.target.value)} />
+          </div>
+          {/* Note */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Note <span className="text-gray-400 font-normal">(optional)</span></label>
+            <textarea className="textarea text-sm w-full resize-none" rows={2}
+              placeholder="Add a message to include in the email..."
+              value={note} onChange={e => setNote(e.target.value)} />
+          </div>
+          {/* Recipients summary */}
+          {allRecipients.length > 0 && (
+            <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
+              <p className="text-xs font-medium text-violet-700 mb-0.5">Sending to {allRecipients.length} recipient{allRecipients.length > 1 ? 's' : ''}:</p>
+              <p className="text-xs text-violet-600 break-all">{allRecipients.join(', ')}</p>
+            </div>
+          )}
+          {error && <p className="text-xs text-rose-500">{error}</p>}
+        </div>
+        <div className="flex items-center justify-end gap-2 p-5 border-t border-gray-100">
+          <button onClick={onClose} className="btn text-xs">Cancel</button>
+          <button onClick={send} disabled={sending || allRecipients.length === 0}
+            className={clsx('btn btn-primary text-xs flex items-center gap-1.5',
+              (sending || allRecipients.length === 0) && 'opacity-50 cursor-not-allowed')}>
+            {sent ? '✅ Sent!' : sending ? '⟳ Sending…' : '✉️ Send Email'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Milestone card ─────────────────────────────────────────────────────────────
 // `forceOpen` (set when this card is shown via its own dedicated tab in the
 // Milestone Configuration tab strip, instead of the "All milestones" list
@@ -714,6 +817,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
   const [tplTasks, setTplTasks] = useState(null)
   const [showTimeline, setShowTimeline] = useState(false)
   const [showRevisit, setShowRevisit] = useState(false)
+  const [showMailbox, setShowMailbox] = useState(false)
   const [draft, setDraft] = useState(ms)
   // Step-driven flow (req 2): Select Milestone (this card) → click a Task to
   // select it → its Subtasks + Time Management appear below. Only one Task
@@ -839,6 +943,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0" onClick={e=>e.stopPropagation()}>
           <button onClick={()=>setShowTimeline(v=>!v)} className="btn text-xs py-1 px-2 hover:text-violet-600 hover:border-violet-200">📅 Time Management</button>
+          <button onClick={()=>setShowMailbox(true)} className="btn text-xs py-1 px-2 hover:text-blue-600 hover:border-blue-200" title="Send milestone details by email">✉️ Send</button>
           <button onClick={()=>setEditName(true)} className="btn text-xs py-1 px-2 hover:text-violet-600 hover:border-violet-200">✏️ Rename</button>
           <button onClick={()=>setShowRevisit(true)} className="btn text-xs py-1 px-2 hover:text-indigo-600 hover:border-indigo-200" title="Create a new revision of this milestone">🔁 Revisit</button>
           <button onClick={()=>onDelete(ms.id)} className="btn text-xs py-1 px-2 hover:text-rose-600 hover:border-rose-200">🗑️ Remove</button>
@@ -1024,13 +1129,16 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
         </div>
       )}
 
-      {/* Revisit modal — rendered inside this card so it has access to ms + showRevisit state */}
+      {/* Revisit modal */}
       {showRevisit && (
-        <RevisitModal
-          ms={ms}
-          projectId={projectId}
-          onClose={() => setShowRevisit(false)}
-          onDone={onUpdate}
+        <RevisitModal ms={ms} projectId={projectId} onClose={() => setShowRevisit(false)} onDone={onUpdate} />
+      )}
+      {/* Mailbox modal */}
+      {showMailbox && (
+        <MailboxModal
+          type="milestone" projectId={projectId} entityId={ms.id}
+          entityName={`M${String(ms.num).padStart(2,'0')} — ${ms.name}`}
+          team={team} onClose={() => setShowMailbox(false)}
         />
       )}
     </div>
