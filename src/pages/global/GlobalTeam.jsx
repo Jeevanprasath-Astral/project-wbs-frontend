@@ -52,6 +52,10 @@ export default function GlobalTeam() {
   const [showRoleModal, setShowRoleModal] = useState(false)
   const [newRoleName, setNewRoleName] = useState('')
   const [savingRole, setSavingRole] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState(null)   // user obj being considered for removal
+  const [removeImpact, setRemoveImpact] = useState(null)   // impact data from /impact endpoint
+  const [removeLoading, setRemoveLoading] = useState(false)
+  const [removeConfirming, setRemoveConfirming] = useState(false)
 
   // Combined role list: built-in ALL_ROLES + any custom roles from DB
   const allRoles = [...ROLES, ...customRoles.map(r => r.name).filter(n => !ROLES.includes(n))]
@@ -160,6 +164,40 @@ export default function GlobalTeam() {
     setEditUser(u)
     setForm({ name: u.name, email: u.email, role: u.role, password: '', team_id: u.team_id ? String(u.team_id) : '' })
     setShowModal(true)
+  }
+
+  const handleShowRemove = async (u) => {
+    setRemoveTarget(u)
+    setRemoveImpact(null)
+    setRemoveLoading(true)
+    setRemoveConfirming(true)
+    try {
+      const res = await api.get(`/global/team/${u.id}/impact`)
+      setRemoveImpact(res.data)
+    } catch(e) {
+      showMsg(e.response?.data?.detail || 'Failed to load impact data', 'error')
+      setRemoveConfirming(false)
+    } finally {
+      setRemoveLoading(false)
+    }
+  }
+
+  const handleConfirmRemove = async () => {
+    if (!removeTarget) return
+    setRemoveLoading(true)
+    try {
+      await api.delete(`/global/team/${removeTarget.id}/remove`)
+      showMsg(`${removeTarget.name} has been permanently removed.`)
+      setRemoveConfirming(false)
+      setRemoveTarget(null)
+      setRemoveImpact(null)
+      invalidateMasterData()
+      load()
+    } catch(e) {
+      showMsg(e.response?.data?.detail || 'Failed to remove member', 'error')
+    } finally {
+      setRemoveLoading(false)
+    }
   }
 
   const filtered = users.filter(u =>
@@ -387,6 +425,15 @@ export default function GlobalTeam() {
                           🚫
                         </button>
                       )}
+                      {u.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handleShowRemove(u)}
+                          disabled={removeLoading && removeTarget?.id === u.id}
+                          title="Permanently remove member"
+                          className="btn text-xs hover:text-red-600 hover:border-red-200 hover:bg-red-50 py-1.5 px-2.5 transition-all">
+                          {removeLoading && removeTarget?.id === u.id ? <span className="animate-spin text-sm">⟳</span> : '🗑️'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -487,6 +534,115 @@ export default function GlobalTeam() {
               <button onClick={handleCreateRole} disabled={!newRoleName.trim() || savingRole}
                 className="btn btn-primary text-xs">
                 {savingRole ? 'Creating...' : 'Create Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Member confirmation modal */}
+      {removeConfirming && removeTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-fade-up">
+
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-red-100 bg-red-50 rounded-t-3xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center text-xl">🗑️</div>
+                <div>
+                  <h2 className="text-sm font-bold text-red-800">Permanently Remove Member</h2>
+                  <p className="text-xs text-red-500">This action cannot be undone</p>
+                </div>
+              </div>
+              <button onClick={() => { setRemoveConfirming(false); setRemoveTarget(null); setRemoveImpact(null) }}
+                className="text-red-300 hover:text-red-500 text-xl font-light">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+
+              {/* Member info */}
+              <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${ROLE_CFG[removeTarget.role]?.color || 'from-gray-400 to-gray-600'} flex items-center justify-center text-white font-bold text-sm shadow`}>
+                  {removeTarget.name?.slice(0,2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm">{removeTarget.name}</div>
+                  <div className="text-xs text-gray-400">{removeTarget.email}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{removeTarget.role}</div>
+                </div>
+              </div>
+
+              {/* Impact data */}
+              {removeLoading ? (
+                <div className="flex items-center justify-center py-6 text-gray-400">
+                  <span className="animate-spin text-2xl mr-2">⟳</span>
+                  <span className="text-sm">Checking dependencies…</span>
+                </div>
+              ) : removeImpact ? (
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Impact Summary</div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className={clsx('rounded-xl p-2.5 text-center', removeImpact.project_count > 0 ? 'bg-orange-50 border border-orange-100' : 'bg-gray-50')}>
+                      <div className={clsx('text-lg font-bold', removeImpact.project_count > 0 ? 'text-orange-600' : 'text-gray-400')}>{removeImpact.project_count}</div>
+                      <div className="text-xs text-gray-500">Project{removeImpact.project_count !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div className={clsx('rounded-xl p-2.5 text-center', removeImpact.total_assignments > 0 ? 'bg-rose-50 border border-rose-100' : 'bg-gray-50')}>
+                      <div className={clsx('text-lg font-bold', removeImpact.total_assignments > 0 ? 'text-rose-600' : 'text-gray-400')}>{removeImpact.total_assignments}</div>
+                      <div className="text-xs text-gray-500">Assignment{removeImpact.total_assignments !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div className={clsx('rounded-xl p-2.5 text-center', removeImpact.work_hours_entries > 0 ? 'bg-amber-50 border border-amber-100' : 'bg-gray-50')}>
+                      <div className={clsx('text-lg font-bold', removeImpact.work_hours_entries > 0 ? 'text-amber-600' : 'text-gray-400')}>{removeImpact.work_hours_entries}</div>
+                      <div className="text-xs text-gray-500">Work Hour Log{removeImpact.work_hours_entries !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+
+                  {removeImpact.project_names?.length > 0 && (
+                    <div className="bg-orange-50 rounded-xl p-3">
+                      <div className="text-xs font-medium text-orange-700 mb-1.5">Affected Projects:</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {removeImpact.project_names.map(pn => (
+                          <span key={pn} className="text-xs bg-white border border-orange-200 text-orange-700 px-2 py-0.5 rounded-full">{pn}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {removeImpact.open_assignments > 0 && (
+                    <div className="bg-rose-50 rounded-xl p-3 flex items-start gap-2">
+                      <span className="text-rose-500 text-sm mt-0.5">⚠️</span>
+                      <div className="text-xs text-rose-700">
+                        <span className="font-medium">{removeImpact.open_assignments} open assignment{removeImpact.open_assignments !== 1 ? 's' : ''}</span> will be permanently deleted.
+                        Tasks will remain but become unassigned.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-start gap-2">
+                    <span className="text-red-500 text-sm mt-0.5">🚨</span>
+                    <div className="text-xs text-red-700">
+                      <span className="font-bold">This is permanent.</span> All of this member's data — project memberships,
+                      task assignments, and work hour logs — will be <span className="font-medium">irreversibly deleted</span>.
+                      Audit history will be preserved but anonymized.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+              <button
+                onClick={() => { setRemoveConfirming(false); setRemoveTarget(null); setRemoveImpact(null) }}
+                className="btn text-xs">
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemove}
+                disabled={removeLoading || !removeImpact}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-all">
+                {removeLoading
+                  ? <><span className="animate-spin">⟳</span> Removing…</>
+                  : <>🗑️ Permanently Remove</>}
               </button>
             </div>
           </div>
