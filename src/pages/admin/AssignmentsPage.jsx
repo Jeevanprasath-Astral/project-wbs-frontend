@@ -175,9 +175,15 @@ export default function AssignmentsPage() {
   const [filterTeam, setFilterTeam] = useState('all')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [showCatModal, setShowCatModal] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [savingCat, setSavingCat] = useState(false)
+  const DEFAULT_CATEGORIES = ['Business Development', 'Research & Development', 'Learning & Development']
   const [form, setForm] = useState({
     title: '', description: '', assigned_to: '',
     milestone_num: '', custom_task_id: '', priority: 'Medium', due_date: '', remarks: '', status: 'Not Started',
+    category: '',
     // Planned date & time — entered up-front at assignment time (testing
     // feedback: "the planned date and time can be entered during
     // assignment"). Split into separate date + time inputs in the form for
@@ -190,6 +196,14 @@ export default function AssignmentsPage() {
   // Milestone (standalone task, not tied to the Milestone/Task hierarchy).
   const selectedMs = customMilestones.find(ms => String(ms.num) === String(form.milestone_num))
   const tasksForMs = selectedMs?.tasks || []
+  const allCategories = [...DEFAULT_CATEGORIES, ...categories.map(c => c.name).filter(n => !DEFAULT_CATEGORIES.includes(n))]
+
+  const loadCategories = async () => {
+    try {
+      const r = await api.get('/global/assignment-categories')
+      setCategories(r.data)
+    } catch(e) { console.error(e) }
+  }
 
   const load = async () => {
     try {
@@ -205,7 +219,7 @@ export default function AssignmentsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load(); loadCategories() }, [id])
 
   const showMsg = (text, type = 'success') => {
     setMessage({ text, type })
@@ -217,8 +231,23 @@ export default function AssignmentsPage() {
 
   const resetForm = () => setForm({
     title:'', description:'', assigned_to:'', milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', remarks:'', status:'Not Started',
+    category: '',
     planned_start_date:'', planned_start_time:'', planned_end_date:'', planned_end_time:'',
   })
+
+  const handleCreateCategory = async () => {
+    const name = newCatName.trim()
+    if (!name) return
+    setSavingCat(true)
+    try {
+      await api.post('/global/assignment-categories', { name })
+      setNewCatName('')
+      setShowCatModal(false)
+      await loadCategories()
+      setForm(f => ({...f, category: name}))
+    } catch(e) { showMsg(e.response?.data?.detail || 'Failed to create category', 'error') }
+    finally { setSavingCat(false) }
+  }
 
   const handleCreate = async () => {
     // Previously this silently `return`ed when title/assigned_to were
@@ -471,6 +500,20 @@ export default function AssignmentsPage() {
               </div>
 
               <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-gray-600">🏷️ Category</label>
+                  <button type="button" onClick={() => { setNewCatName(''); setShowCatModal(true) }}
+                    className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-medium transition-colors">
+                    <span className="text-base leading-none">＋</span> Custom
+                  </button>
+                </div>
+                <select className="select text-sm" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                  <option value="">— No category —</option>
+                  {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">📄 Description</label>
                 <textarea className="textarea text-sm" rows={2}
                   placeholder="Add task details, instructions or context..."
@@ -603,6 +646,33 @@ export default function AssignmentsPage() {
                 onClick={handleCreate}
                 disabled={saving}>
                 {saving ? <><span className="animate-spin">⟳</span> Assigning…</> : <>📌 Assign task</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Custom Category Modal */}
+      {showCatModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">➕ Create Custom Category</h3>
+              <button onClick={() => setShowCatModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            <input
+              className="input text-sm mb-4"
+              placeholder="e.g. Product Development"
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreateCategory()}
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowCatModal(false)} className="btn text-xs">Cancel</button>
+              <button onClick={handleCreateCategory} disabled={!newCatName.trim() || savingCat}
+                className="btn btn-primary text-xs">
+                {savingCat ? 'Creating...' : 'Create Category'}
               </button>
             </div>
           </div>
