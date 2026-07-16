@@ -180,7 +180,13 @@ export default function GlobalAssignments() {
       setShowModal(false)
       setForm({ project_id:'', title:'', description:'', assigned_to:'', milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', team:'', remarks:'', status:'Not Started', category:'' })
       load()
-    } catch(e) { showMsg(e.response?.data?.detail || 'Failed', 'error') }
+    } catch(e) {
+      const detail = e.response?.data?.detail
+      const errMsg = Array.isArray(detail)
+        ? detail.map(d => d.msg || d.message || JSON.stringify(d)).join('; ')
+        : (typeof detail === 'string' ? detail : 'Assignment failed. Please try again.')
+      showMsg(errMsg, 'error')
+    }
     finally { setSaving(false) }
   }
 

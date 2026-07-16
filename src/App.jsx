@@ -37,6 +37,7 @@ const FinancialSettingsPage   = lazy(() => import('./pages/global/FinancialSetti
 const TeamUtilizationPage     = lazy(() => import('./pages/global/TeamUtilizationPage'))
 const CostBreakdownPage       = lazy(() => import('./pages/global/CostBreakdownPage'))
 const BillingStatementPage    = lazy(() => import('./pages/global/BillingStatementPage'))
+const AuditLogPage            = lazy(() => import('./pages/global/AuditLogPage'))
 
 function ProtectedRoute({ children }) {
   const token = useAppStore(s => s.token)
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="cost-breakdown"      element={<CostBreakdownPage />} />
           <Route path="billing-statement"   element={<BillingStatementPage />} />
           <Route path="financial-settings"  element={<FinancialSettingsPage />} />
+          <Route path="audit-log"           element={<AuditLogPage />} />
         </Route>
 
         {/* Project-specific */}
