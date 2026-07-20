@@ -355,6 +355,20 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
   const [draft, setDraft] = useState(t)
   const [showTaskMailbox, setShowTaskMailbox] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
+  const [noteText, setNoteText] = useState(t.notes || '')
+  const [savingNote, setSavingNote] = useState(false)
+  const [noteSaved, setNoteSaved] = useState(false)
+
+  const saveNote = async () => {
+    setSavingNote(true)
+    try {
+      await api.patch(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`, { notes: noteText })
+      setNoteSaved(true)
+      setTimeout(() => setNoteSaved(false), 2000)
+    } finally { setSavingNote(false) }
+  }
 
   const delTask = async () => {
     if (!window.confirm('Delete this task and all its form fields?')) return
@@ -372,13 +386,31 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
       <div className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-violet-50/20 cursor-pointer" onClick={onSelect}>
         <div className={clsx('w-2 h-2 rounded-full flex-shrink-0', isOpen ? 'bg-violet-600' : 'bg-violet-400')} />
         <span className="text-sm font-semibold text-gray-800 flex-1">Task {String(t.num).padStart(2,'0')} — {t.name}</span>
-        <span className="text-xs text-gray-400">{t.form_fields?.length||0} fields</span>
         <span className={clsx('text-xs px-1.5 py-0.5 rounded-md',
           t.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : t.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')}>
           {t.status||'Not Started'}
         </span>
         {t.responsibility && <span className="text-xs text-gray-400">{t.responsibility}</span>}
         <div className="flex gap-1 flex-shrink-0" onClick={e=>e.stopPropagation()}>
+          <button
+            onClick={()=>setShowForm(v=>!v)}
+            className={clsx('btn text-xs py-0.5 px-2 flex items-center gap-1 font-medium',
+              showForm ? 'bg-violet-600 text-white border-violet-600' : 'text-violet-600 border-violet-300 hover:bg-violet-50')}
+            title="Show / hide form fields">
+            📋 Form
+            {(t.form_fields?.length||0) > 0 &&
+              <span className={clsx('text-[10px] px-1 rounded-full', showForm ? 'bg-white/30 text-white' : 'bg-violet-100 text-violet-700')}>
+                {t.form_fields.length}
+              </span>}
+          </button>
+          <button
+            onClick={()=>setShowNotes(v=>!v)}
+            className={clsx('btn text-xs py-0.5 px-2 flex items-center gap-1 font-medium',
+              showNotes ? 'bg-amber-500 text-white border-amber-500' : 'text-amber-600 border-amber-300 hover:bg-amber-50')}
+            title="Show / hide task notes">
+            📝 Notes
+            {noteText && <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', showNotes ? 'bg-white' : 'bg-amber-500')} />}
+          </button>
           <button onClick={()=>setShowTimeline(v=>!v)}
             className={clsx('btn text-xs py-0.5 px-1.5 hover:text-violet-600 hover:border-violet-200', showTimeline && 'text-violet-600 border-violet-200 bg-violet-50')}
             title="Time Management">📅</button>
@@ -388,9 +420,38 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
         <span className="text-gray-300 text-xs">{isOpen?'▲':'▼'}</span>
       </div>
 
+      {/* Form panel — toggled independently by the Form button */}
+      {showForm && (
+        <div className="border-t border-violet-100 bg-violet-50/30 p-3" onClick={e=>e.stopPropagation()}>
+          <TaskFormPanel t={t} ms={ms} projectId={projectId} onUpdate={onUpdate} />
+        </div>
+      )}
+
+      {/* Notes panel — toggled by the Notes button */}
+      {showNotes && (
+        <div className="border-t border-amber-100 bg-amber-50/30 p-3" onClick={e=>e.stopPropagation()}>
+          <div className="text-xs font-semibold text-amber-700 mb-2">📝 Task Notes</div>
+          <textarea
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            rows={4}
+            placeholder="Enter notes, comments, or observations for this task..."
+            className="w-full text-sm border border-amber-200 rounded-lg p-2 resize-y focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <button onClick={saveNote} disabled={savingNote}
+              className="btn btn-primary text-xs py-1 px-3">
+              {savingNote ? 'Saving…' : noteSaved ? '✅ Saved!' : '💾 Save Note'}
+            </button>
+            <button onClick={() => { setNoteText(t.notes || ''); setShowNotes(false) }}
+              className="btn text-xs py-1 px-3">Cancel</button>
+          </div>
+        </div>
+      )}
+
       {isOpen && (
         <div className="border-t border-gray-50 p-3" onClick={e=>e.stopPropagation()}>
-          {/* Step 1: Date & Time Management */}
+          {/* Date & Time Management */}
           {showTimeline && (
             <div className="mb-2">
               <div className="text-xs font-semibold text-violet-700 mb-2 flex items-center gap-1.5">
@@ -404,9 +465,6 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
               </div>
             </div>
           )}
-
-          {/* Step 2: Form fields panel */}
-          <TaskFormPanel t={t} ms={ms} projectId={projectId} onUpdate={onUpdate} />
 
           <AttachmentPanel entityType="task" entityId={t.id} />
         </div>
