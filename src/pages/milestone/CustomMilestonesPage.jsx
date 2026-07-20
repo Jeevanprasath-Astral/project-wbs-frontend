@@ -147,330 +147,171 @@ function TimelineFields({ value, onChange, team, showHours, showVarianceReason }
   )
 }
 
-// ── Activity row (optional, nested under a subtask) ──────────────────────────
-function ActivityRow({ a, projectId, msId, taskId, subId, onUpdate, team }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(() => seedHoursDraft(a))
-
-  const save = async () => {
-    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${subId}/activities/${a.id}`, draft)
-    setEditing(false)  // optimistic — no full reload needed
-  }
-  const del = async () => {
-    if (!window.confirm('Delete this activity?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${subId}/activities/${a.id}`)
-    onUpdate()
-  }
-  return (
-    <div className="p-2 bg-white rounded-lg border border-gray-100 mb-1.5">
-      <div className="flex items-center gap-2">
-        <span className="text-xs">🔹</span>
-        {editing ? (
-          <input className="input text-xs h-6 flex-1" value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})} autoFocus />
-        ) : (
-          <span className="text-xs text-gray-700 flex-1">{a.name}</span>
-        )}
-        <span className={clsx('text-xs px-1.5 py-0.5 rounded-md',
-          a.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : a.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')}>
-          {a.status}
-        </span>
-        {editing ? (
-          <>
-            <button onClick={save} className="btn btn-primary text-xs py-0.5 px-1.5">✓</button>
-            <button onClick={()=>{setEditing(false);setDraft(seedHoursDraft(a))}} className="btn text-xs py-0.5 px-1.5">✕</button>
-          </>
-        ) : (
-          <>
-            <button onClick={()=>setEditing(true)} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600">✏️</button>
-            <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
-          </>
-        )}
-      </div>
-      {editing && <TimelineFields value={draft} onChange={setDraft} team={team} showHours />}
-      <AttachmentPanel entityType="activity" entityId={a.id} />
-    </div>
-  )
-}
-
-// ── Subtask row ────────────────────────────────────────────────────────────────
-// ── One question + answer row, nested inside an expanded Subtask. Mirrors the
-// standard Milestone system's per-question buffered-answer + explicit Save
-// pattern (QuestionRow in MilestonePage.jsx), so a Subtask that has grown
-// multiple questions behaves the same way that system always has. ───────────
-function SubtaskQuestionRow({ q, projectId, msId, taskId, subId, onUpdate }) {
+// ── Task Form Field row ────────────────────────────────────────────────────────
+// One form field (question + answer) under a Task. Fields are grouped visually
+// by section_name — a header is shown when the section_name changes.
+function FormFieldRow({ f, projectId, msId, taskId, onUpdate, isFirst, showSection }) {
   const [editingText, setEditingText] = useState(false)
-  const [textDraft, setTextDraft] = useState({ question_text: q.question_text, input_type: q.input_type })
-  const [answer, setAnswer] = useState(q.response || '')
+  const [textDraft, setTextDraft] = useState({ question_text: f.question_text, input_type: f.input_type })
+  const [answer, setAnswer] = useState(f.response || '')
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const saveAnswer = async () => {
-    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${subId}/questions/${q.id}`, { response: answer })
+    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`, { response: answer })
     setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 1500)
   }
   const saveText = async () => {
-    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${subId}/questions/${q.id}`, textDraft)
+    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`, textDraft)
     setEditingText(false)
   }
   const del = async () => {
-    if (!window.confirm('Delete this question?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${subId}/questions/${q.id}`)
+    if (!window.confirm('Delete this form field?')) return
+    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`)
     onUpdate()
   }
 
   return (
-    <div className="mb-2 p-2.5 bg-white rounded-xl border border-violet-100">
-      <div className="flex items-center gap-2 mb-1.5">
-        {editingText ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input className="input text-xs h-7 flex-1" value={textDraft.question_text}
-              onChange={e => setTextDraft({...textDraft, question_text: e.target.value})} autoFocus />
-            <select className="select text-xs h-7 w-24" value={textDraft.input_type}
-              onChange={e => setTextDraft({...textDraft, input_type: e.target.value})}>
-              {INPUT_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
-            <button onClick={saveText} className="btn btn-primary text-xs py-0.5 px-1.5">✓</button>
-            <button onClick={() => {setEditingText(false); setTextDraft({question_text:q.question_text, input_type:q.input_type})}} className="btn text-xs py-0.5 px-1.5">✕</button>
-          </div>
-        ) : (
-          <>
-            <label className="text-xs font-medium text-violet-700 flex-1">{q.question_text}</label>
-            <button onClick={() => setEditingText(true)} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600">✏️</button>
-            <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
-          </>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <ResponseField inputType={q.input_type} value={answer} onChange={v => {setAnswer(v); setDirty(true)}} />
+    <>
+      {showSection && f.section_name && (
+        <div className={clsx('text-xs font-semibold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100', isFirst ? 'mt-0 mb-2' : 'mt-4 mb-2')}>
+          📁 {f.section_name}
         </div>
-        <button onClick={saveAnswer} disabled={!dirty} className={clsx('btn text-xs py-1 px-2 flex-shrink-0', dirty && 'btn-primary')}>
-          {saved ? '✅' : '💾 Save'}
-        </button>
+      )}
+      <div className="mb-2 p-2.5 bg-white rounded-xl border border-violet-100">
+        <div className="flex items-center gap-2 mb-1.5">
+          {editingText ? (
+            <div className="flex items-center gap-2 flex-1">
+              <input className="input text-xs h-7 flex-1" value={textDraft.question_text}
+                onChange={e => setTextDraft({...textDraft, question_text: e.target.value})} autoFocus />
+              <select className="select text-xs h-7 w-24" value={textDraft.input_type}
+                onChange={e => setTextDraft({...textDraft, input_type: e.target.value})}>
+                {INPUT_TYPES.map(t => <option key={t}>{t}</option>)}
+              </select>
+              <button onClick={saveText} className="btn btn-primary text-xs py-0.5 px-1.5">✓</button>
+              <button onClick={() => {setEditingText(false); setTextDraft({question_text:f.question_text, input_type:f.input_type})}} className="btn text-xs py-0.5 px-1.5">✕</button>
+            </div>
+          ) : (
+            <>
+              <label className="text-xs font-medium text-violet-700 flex-1">{f.question_text}</label>
+              <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded">{f.input_type}</span>
+              <button onClick={() => setEditingText(true)} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600" title="Edit question">✏️</button>
+              <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600" title="Delete field">🗑️</button>
+            </>
+          )}
+        </div>
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <ResponseField inputType={f.input_type} value={answer} onChange={v => { setAnswer(v); setDirty(true) }} />
+          </div>
+          <button onClick={saveAnswer} disabled={!dirty} className={clsx('btn text-xs py-1 px-2 flex-shrink-0 mt-0.5', dirty && 'btn-primary')}>
+            {saved ? '✅' : '💾'}
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
-// ── Report row (optional, multiple per Milestone) ─────────────────────────────
-// Reports are associated at the Milestone level — identified by Report Number /
-// Report Name / Department, plus Status / Assigned To / Due Date — letting
-// several reports point at the same Milestone without needing separate
-// task/subtask structure per report.
-function ReportRow({ r, projectId, msId, onUpdate, team }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(r)
-  const [error, setError] = useState('')
+// ── Task Form Panel — replaces the old Subtask+Question hierarchy ─────────────
+// Shows all form_fields for a Task, grouped by section_name (= former Subtask
+// name). Admins and PMs can add new fields and edit/delete existing ones.
+function TaskFormPanel({ t, ms, projectId, onUpdate }) {
+  const fields = t.form_fields || []
+  const [addingField, setAddingField] = useState(false)
+  const [newField, setNewField] = useState({ question_text: '', input_type: 'text', section_name: '' })
+  const [saving, setSaving] = useState(false)
 
-  const save = async () => {
-    setError('')
+  const saveField = async () => {
+    if (!newField.question_text.trim()) return
+    setSaving(true)
     try {
-      await api.patch(`/projects/${projectId}/custom-milestones/${msId}/reports/${r.id}`, draft)
-      setEditing(false)  // optimistic — no full reload needed
-    } catch (e) { setError(e.response?.data?.detail || 'Failed to save report') }
-  }
-  const del = async () => {
-    if (!window.confirm('Delete this report?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/reports/${r.id}`)
-    onUpdate()
+      await api.post(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}/form-fields`, {
+        question_text: newField.question_text.trim(),
+        input_type: newField.input_type,
+        section_name: newField.section_name.trim() || null,
+        num: fields.length + 1,
+      })
+      setNewField({ question_text: '', input_type: 'text', section_name: '' })
+      setAddingField(false)
+      onUpdate()
+    } catch (e) { console.error(e) }
+    finally { setSaving(false) }
   }
 
-  if (editing) {
+  if (fields.length === 0 && !addingField) {
     return (
-      <div className="p-2 bg-white rounded-lg border border-gray-100 mb-1.5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <div>
-            <label className="block text-xs text-gray-400 mb-0.5">Report Number</label>
-            <input className="input text-xs h-7 w-full" value={draft.report_number||''} onChange={e=>setDraft({...draft,report_number:e.target.value})} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs text-gray-400 mb-0.5">Report Name</label>
-            <input className="input text-xs h-7 w-full" value={draft.report_name||''} onChange={e=>setDraft({...draft,report_name:e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-0.5">Department</label>
-            <input className="input text-xs h-7 w-full" value={draft.department||''} onChange={e=>setDraft({...draft,department:e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-0.5">Status</label>
-            <select className="select text-xs h-7 w-full" value={draft.status||'Not Started'} onChange={e=>setDraft({...draft,status:e.target.value})}>
-              {STATUSES.map(st=><option key={st}>{st}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-0.5">Assigned To</label>
-            {team?.length > 0 ? (
-              <select className="select text-xs h-7 w-full" value={draft.assigned_to||''} onChange={e=>setDraft({...draft,assigned_to:e.target.value})}>
-                <option value="">— Unassigned —</option>
-                {team.map(m=><option key={m.id} value={m.name}>{m.name}</option>)}
-              </select>
-            ) : (
-              <input className="input text-xs h-7 w-full" value={draft.assigned_to||''} onChange={e=>setDraft({...draft,assigned_to:e.target.value})} />
-            )}
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-0.5">Due Date</label>
-            <input type="date" className="input text-xs h-7 w-full" value={dfmt(draft.due_date)} onChange={e=>setDraft({...draft,due_date:e.target.value})} />
-          </div>
-        </div>
-        {error && <div className="text-xs text-rose-600 mt-1.5">{error}</div>}
-        <div className="flex items-center gap-2 mt-2">
-          <button onClick={save} className="btn btn-primary text-xs py-0.5 px-1.5">✓ Save</button>
-          <button onClick={()=>{setEditing(false);setDraft(r);setError('')}} className="btn text-xs py-0.5 px-1.5">✕</button>
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
+          <span>📋</span> <span>No form fields yet.</span>
+          <button onClick={() => setAddingField(true)} className="text-violet-600 hover:text-violet-800 font-medium">Add one →</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="p-2 bg-white rounded-lg border border-gray-100 mb-1.5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs">📄</span>
-        <span className="text-xs font-medium text-gray-700">{r.report_number}</span>
-        <span className="text-xs text-gray-600 flex-1 truncate min-w-[6rem]">{r.report_name}</span>
-        {r.department && <span className="text-xs text-gray-400 flex-shrink-0">{r.department}</span>}
-        {r.assigned_to && <span className="text-xs text-violet-500 flex-shrink-0">👤 {r.assigned_to}</span>}
-        {r.due_date && <span className="text-xs text-gray-400 flex-shrink-0">📆 {dfmt(r.due_date)}</span>}
-        <span className={clsx('text-xs px-1.5 py-0.5 rounded-md flex-shrink-0',
-          r.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : r.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')}>
-          {r.status}
-        </span>
-        <button onClick={()=>setEditing(true)} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600">✏️</button>
-        <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
-      </div>
-      <AttachmentPanel entityType="report" entityId={r.id} />
-    </div>
-  )
-}
-
-function SubtaskRow({ s, msId, taskId, projectId, onUpdate, team }) {
-  const [editing, setEditing] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [draft, setDraft] = useState(() => seedHoursDraft(s))
-  const [addingActivity, setAddingActivity] = useState(false)
-  const [newActivity, setNewActivity] = useState('')
-  const [addingQuestion, setAddingQuestion] = useState(false)
-  const [newQuestion, setNewQuestion] = useState({ question_text: '', input_type: 'text' })
-
-  const save = async () => {
-    await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${s.id}`, draft)
-    setEditing(false)  // optimistic — no full reload
-  }
-  const del = async () => {
-    if (!window.confirm('Delete this subtask?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${s.id}`)
-    onUpdate()
-  }
-  const saveActivity = async () => {
-    if (!newActivity.trim()) return
-    await api.post(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${s.id}/activities`, { name: newActivity })
-    setNewActivity(''); setAddingActivity(false); onUpdate()
-  }
-  const saveQuestion = async () => {
-    if (!newQuestion.question_text.trim()) return
-    await api.post(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/subtasks/${s.id}/questions`, newQuestion)
-    setNewQuestion({ question_text: '', input_type: 'text' }); setAddingQuestion(false); onUpdate()
-  }
-  // Time Management (and the answer area below it) only opens via the small
-  // 📅 icon — not by clicking anywhere on the row — matching how the old
-  // Milestone system behaved.
-  const toggleExpanded = () => setExpanded(e => !e)
-
-  return (
-    <div className="py-2 px-3 bg-gray-50 rounded-xl mb-1.5 group">
-      <div className="flex items-center gap-2">
-        <span className="text-gray-400 text-xs w-5 flex-shrink-0">{s.num}</span>
-        {editing ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input className="input text-xs h-7 flex-1" value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})} autoFocus />
-            <select className="select text-xs h-7 w-28" value={draft.input_type} onChange={e => setDraft({...draft,input_type:e.target.value})}>
-              {INPUT_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
-            <button onClick={save} className="btn btn-primary text-xs py-1 px-2">✓</button>
-            <button onClick={() => {setEditing(false);setDraft(seedHoursDraft(s))}} className="btn text-xs py-1 px-2">✕</button>
-          </div>
-        ) : (
-          <>
-            <span className="text-xs text-gray-700 flex-1">{s.name}</span>
-            <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-lg border border-violet-100 flex-shrink-0">{s.input_type}</span>
-            <span className={clsx('text-xs px-1.5 py-0.5 rounded-md flex-shrink-0',
-              s.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : s.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-200 text-gray-500')}>
-              {s.status}
-            </span>
-            {s.questions?.length > 0 && (
-              <span className="text-xs text-gray-400 flex-shrink-0">❓{s.questions.length}</span>
-            )}
-            {s.activities?.length > 0 && (
-              <span className="text-xs text-gray-400 flex-shrink-0">🔹{s.activities.length}</span>
-            )}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 flex-shrink-0">
-              <button onClick={toggleExpanded} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600">{expanded?'▲':'📅'}</button>
-              <button onClick={() => setEditing(true)} className="btn text-xs py-0.5 px-1.5 hover:text-violet-600">✏️</button>
-              <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
-            </div>
-          </>
-        )}
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <div className="text-xs font-semibold text-violet-700 mb-3 flex items-center gap-1.5">
+        <span className="w-4 h-4 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px]">2</span>
+        Form <span className="font-normal text-gray-400">({fields.length} field{fields.length!==1?'s':''})</span>
       </div>
 
-      {expanded && (
-        <div className="mt-2 pl-7">
-          {/* Question(s) & answer(s) — a Subtask starts with one implicit
-              question (its own input_type/response) and can grow more, same
-              as a Subtask in the old Milestone system could carry several
-              Questions. */}
-          {s.questions?.length > 0 ? (
-            <div className="mb-3">
-              {s.questions.map(q => (
-                <SubtaskQuestionRow key={q.id} q={q} projectId={projectId} msId={msId} taskId={taskId} subId={s.id} onUpdate={onUpdate} />
-              ))}
+      {/* Group fields by section_name */}
+      {(() => {
+        let lastSection = '__NONE__'
+        return fields.map((f, idx) => {
+          const secChanged = f.section_name !== lastSection
+          if (secChanged) lastSection = f.section_name
+          return (
+            <FormFieldRow
+              key={f.id}
+              f={f}
+              projectId={projectId}
+              msId={ms.id}
+              taskId={t.id}
+              onUpdate={onUpdate}
+              isFirst={idx === 0}
+              showSection={secChanged}
+            />
+          )
+        })
+      })()}
+
+      {addingField ? (
+        <div className="mt-2 p-3 bg-violet-50 rounded-xl border border-violet-100 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs text-gray-500 mb-0.5">Question / Field label <span className="text-rose-500">*</span></label>
+              <input className="input text-xs h-8 w-full" placeholder="e.g. Session date" value={newField.question_text}
+                onChange={e => setNewField({...newField, question_text: e.target.value})}
+                onKeyDown={e => e.key === 'Enter' && saveField()} autoFocus />
             </div>
-          ) : (
-            <div className="mb-3 p-2.5 bg-white rounded-xl border border-violet-100">
-              <label className="block text-xs font-medium text-violet-700 mb-1.5">{s.name} — your answer</label>
-              <ResponseField inputType={s.input_type} value={draft.response} onChange={v => setDraft({...draft, response: v})} />
-            </div>
-          )}
-          {addingQuestion ? (
-            <div className="flex items-center gap-2 mb-3">
-              <input className="input text-xs h-7 flex-1" placeholder="Question text..." value={newQuestion.question_text}
-                onChange={e=>setNewQuestion({...newQuestion, question_text: e.target.value})} onKeyDown={e=>e.key==='Enter'&&saveQuestion()} autoFocus />
-              <select className="select text-xs h-7 w-24" value={newQuestion.input_type} onChange={e=>setNewQuestion({...newQuestion, input_type: e.target.value})}>
+            <div>
+              <label className="block text-xs text-gray-500 mb-0.5">Input type</label>
+              <select className="select text-xs h-8 w-full" value={newField.input_type}
+                onChange={e => setNewField({...newField, input_type: e.target.value})}>
                 {INPUT_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
-              <button onClick={saveQuestion} className="btn btn-primary text-xs py-1 px-2">✓ Add</button>
-              <button onClick={()=>setAddingQuestion(false)} className="btn text-xs py-1 px-2">✕</button>
             </div>
-          ) : (
-            <button onClick={()=>setAddingQuestion(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium mb-3 block">➕ Add question</button>
-          )}
-
-          <div className="text-xs text-gray-500 font-medium mb-1">Time Management</div>
-          <TimelineFields value={draft} team={team} showHours onChange={setDraft} />
-          <div className="flex items-center gap-2 mt-2">
-            <button onClick={save} className="btn btn-primary text-xs py-1 px-2">💾 Save</button>
-            <button onClick={()=>setDraft(seedHoursDraft(s))} className="btn text-xs py-1 px-2">Cancel</button>
+            <div>
+              <label className="block text-xs text-gray-500 mb-0.5">Section (optional)</label>
+              <input className="input text-xs h-8 w-full" placeholder="e.g. Understand client"
+                value={newField.section_name}
+                onChange={e => setNewField({...newField, section_name: e.target.value})} />
+            </div>
           </div>
-
-          {/* Activities (optional) */}
-          <div className="mt-3">
-            <div className="text-xs text-gray-500 font-medium mb-1">Activities (optional)</div>
-            {s.activities?.map(a => (
-              <ActivityRow key={a.id} a={a} projectId={projectId} msId={msId} taskId={taskId} subId={s.id} onUpdate={onUpdate} team={team} />
-            ))}
-            {addingActivity ? (
-              <div className="flex items-center gap-2">
-                <input className="input text-xs h-7 flex-1" placeholder="Activity name..." value={newActivity}
-                  onChange={e=>setNewActivity(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveActivity()} autoFocus />
-                <button onClick={saveActivity} className="btn btn-primary text-xs py-1 px-2">✓ Add</button>
-                <button onClick={()=>setAddingActivity(false)} className="btn text-xs py-1 px-2">✕</button>
-              </div>
-            ) : (
-              <button onClick={()=>setAddingActivity(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium">➕ Add activity</button>
-            )}
+          <div className="flex items-center gap-2">
+            <button onClick={saveField} disabled={saving || !newField.question_text.trim()} className="btn btn-primary text-xs py-1 px-2">
+              {saving ? '⟳' : '✓ Add field'}
+            </button>
+            <button onClick={() => setAddingField(false)} className="btn text-xs py-1 px-2">✕</button>
           </div>
-
-          <AttachmentPanel entityType="subtask" entityId={s.id} />
         </div>
+      ) : (
+        <button onClick={() => setAddingField(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium flex items-center gap-1 mt-1">
+          ➕ Add field
+        </button>
       )}
     </div>
   )
@@ -510,46 +351,19 @@ function FromTemplatePicker({ items, labelKey, onPick, onClose, title }) {
 // replaces the earlier layout where Time Management sat below the Subtasks,
 // which testers found confusing.
 function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
-  const [addSub, setAddSub] = useState(false)
-  const [newSub, setNewSub] = useState({ name:'', input_type:'text' })
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState(t)
-  const [showTplSubs, setShowTplSubs] = useState(false)
-  const [tplSubs, setTplSubs] = useState(null)
   const [showTaskMailbox, setShowTaskMailbox] = useState(false)
-  // Time Management is collapsed behind an icon on the Task row itself —
-  // same pattern as the 📅 toggle on Subtask rows — instead of always
-  // rendering inline, which took up space whenever a Task was opened.
   const [showTimeline, setShowTimeline] = useState(false)
 
-  const saveSubtask = async () => {
-    if (!newSub.name) return
-    setSaving(true)
-    await api.post(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}/subtasks`, newSub)
-    setNewSub({ name:'', input_type:'text' }); setAddSub(false); setSaving(false); onUpdate()
-  }
   const delTask = async () => {
-    if (!window.confirm('Delete this task and all its subtasks?')) return
+    if (!window.confirm('Delete this task and all its form fields?')) return
     await api.delete(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`)
     onUpdate()
   }
   const saveTimeline = async () => {
     await api.patch(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`, draft)
-    setShowTimeline(false)  // optimistic — no full reload
-  }
-  const openTplSubs = async () => {
-    setShowTplSubs(true)
-    try {
-      const res = await api.get(`/projects/${projectId}/custom-milestones/templates/${ms.num}/detail`)
-      const stdTask = res.data.tasks.find(x => x.num === t.num)
-      setTplSubs((stdTask?.subtasks || []).filter(s => !t.subtasks?.some(es => es.num === s.num)))
-    } catch { setTplSubs([]) }
-  }
-  const pickTplSub = async (sub) => {
-    try {
-      await api.post(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}/subtasks/from-template`, null, { params: { subtask_num: sub.num } })
-      setShowTplSubs(false); onUpdate()
-    } catch (e) { /* ignore dup */ }
+    setShowTimeline(false)
   }
 
   return (
@@ -558,7 +372,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
       <div className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-violet-50/20 cursor-pointer" onClick={onSelect}>
         <div className={clsx('w-2 h-2 rounded-full flex-shrink-0', isOpen ? 'bg-violet-600' : 'bg-violet-400')} />
         <span className="text-sm font-semibold text-gray-800 flex-1">Task {String(t.num).padStart(2,'0')} — {t.name}</span>
-        <span className="text-xs text-gray-400">{t.subtasks?.length||0} subtasks</span>
+        <span className="text-xs text-gray-400">{t.form_fields?.length||0} fields</span>
         <span className={clsx('text-xs px-1.5 py-0.5 rounded-md',
           t.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : t.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')}>
           {t.status||'Not Started'}
@@ -576,9 +390,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
 
       {isOpen && (
         <div className="border-t border-gray-50 p-3" onClick={e=>e.stopPropagation()}>
-          {/* Step 1: Date & Time Management — toggled via the 📅 icon on the
-              Task row above (same pattern as Milestone + Subtask level)
-              instead of always rendering inline. */}
+          {/* Step 1: Date & Time Management */}
           {showTimeline && (
             <div className="mb-2">
               <div className="text-xs font-semibold text-violet-700 mb-2 flex items-center gap-1.5">
@@ -593,36 +405,8 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
             </div>
           )}
 
-          {/* Step 2: all Subtask forms for the selected Task */}
-          <div className="mt-4 pt-3 border-t border-gray-100">
-            <div className="text-xs font-semibold text-violet-700 mb-2 flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px]">2</span>
-              Subtasks
-            </div>
-            {t.subtasks?.map(s => <SubtaskRow key={s.id} s={s} msId={ms.id} taskId={t.id} projectId={projectId} onUpdate={onUpdate} team={team} />)}
-            {addSub ? (
-              <div className="flex items-center gap-2 mt-2 p-2 bg-violet-50 rounded-xl border border-violet-100">
-                <input className="input text-xs h-7 flex-1" placeholder="Subtask name..." value={newSub.name}
-                  onChange={e=>setNewSub({...newSub,name:e.target.value})} onKeyDown={e=>e.key==='Enter'&&saveSubtask()} autoFocus />
-                <select className="select text-xs h-7 w-28" value={newSub.input_type} onChange={e=>setNewSub({...newSub,input_type:e.target.value})}>
-                  {INPUT_TYPES.map(tp=><option key={tp}>{tp}</option>)}
-                </select>
-                <button onClick={saveSubtask} disabled={saving} className="btn btn-primary text-xs py-1 px-2">{saving?'⟳':'✓ Add'}</button>
-                <button onClick={()=>setAddSub(false)} className="btn text-xs py-1 px-2">✕</button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 mt-2">
-                <button onClick={()=>setAddSub(true)} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 font-medium">➕ Add subtask</button>
-                <button onClick={openTplSubs} className="text-xs text-gray-400 hover:text-violet-600 flex items-center gap-1 font-medium">📋 From template</button>
-              </div>
-            )}
-            {showTplSubs && (
-              <div className="mt-2">
-                <FromTemplatePicker items={tplSubs||[]} labelKey="name" title="Add subtask from standard template"
-                  onPick={pickTplSub} onClose={()=>setShowTplSubs(false)} />
-              </div>
-            )}
-          </div>
+          {/* Step 2: Form fields panel */}
+          <TaskFormPanel t={t} ms={ms} projectId={projectId} onUpdate={onUpdate} />
 
           <AttachmentPanel entityType="task" entityId={t.id} />
         </div>
@@ -899,7 +683,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
   }
 
   const taskCount = ms.tasks?.length||0
-  const subCount = ms.tasks?.reduce((a,t)=>a+(t.subtasks?.length||0),0)||0
+  const fieldCount = ms.tasks?.reduce((a,t)=>a+(t.form_fields?.length||0),0)||0
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fade-up">
@@ -925,7 +709,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
             </div>
           )}
           <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
-            <span>{taskCount} tasks · {subCount} subtasks{ms.reports?.length > 0 ? ` · 📄 ${ms.reports.length} report${ms.reports.length !== 1 ? 's' : ''}` : ''}{ms.responsible&&` · ${ms.responsible}`}</span>
+            <span>{taskCount} tasks · {fieldCount} form fields{ms.responsible&&` · ${ms.responsible}`}</span>
             {ms.assignee && <span className="text-violet-500">👤 {ms.assignee}</span>}
             {ms.status && (
               <span className={clsx('px-1.5 py-0.5 rounded-md',
@@ -965,11 +749,8 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
       {open && (
         <div className="border-t border-gray-100 p-4">
 
-          {/* ── Reports (optional, multiple per Milestone) ─────────────────
-              Displayed directly below the Milestone header so reports can be
-              associated with the whole Milestone rather than a specific
-              subtask. Tasks and Subtasks follow below. */}
-          <div className="mb-4 pb-4 border-b border-gray-100">
+          {/* ── Reports section (hidden from UI; backend data preserved) ── */}
+          {false && <div className="mb-4 pb-4 border-b border-gray-100 hidden-reports-section">
             <div className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5 flex-wrap">
               <span>📄</span> Reports <span className="text-gray-400 font-normal">(optional)</span>
               {ms.reports?.length > 0 && (
@@ -1087,11 +868,11 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
             ) : (
               <button onClick={()=>setAddingReport(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium">➕ Add report</button>
             )}
-          </div>
+          </div>}
 
           {/* ── Tasks ──────────────────────────────────────────────────────── */}
           {taskCount > 0 && (
-            <div className="text-xs text-gray-400 mb-2">👉 Click a task below to fill in its subtasks and time management.</div>
+            <div className="text-xs text-gray-400 mb-2">👉 Click a task below to open its form fields and time management.</div>
           )}
           {ms.tasks?.map(t => (
             <TaskBlock key={t.id} t={t} ms={ms} projectId={projectId} onUpdate={onUpdate} team={team}
@@ -1237,8 +1018,8 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
             <div className="flex items-center gap-2">
               <span className="text-xl">🧩</span>
               <div>
-                <h2 className="text-sm font-semibold text-gray-900">Select Task(s) and Subtask(s)</h2>
-                <p className="text-xs text-gray-400">Selecting a subtask automatically selects its Task and Milestone.</p>
+                <h2 className="text-sm font-semibold text-gray-900">Select Task(s)</h2>
+                <p className="text-xs text-gray-400">Form fields are generated automatically for each selected task.</p>
               </div>
             </div>
             <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl">✕</button>
@@ -1253,7 +1034,7 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
                   {det.tasks.filter(t=>!t.already_added).map(t => {
                     const taskSel = selection[num]?.[t.num]
                     const taskChecked = !!taskSel
-                    const availSubs = t.subtasks.filter(s=>!s.already_added)
+                    const availSubs = t.subtasks ? t.subtasks.filter(s=>!s.already_added) : []
                     return (
                       <div key={t.num} className="mb-2 pl-1">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -1261,15 +1042,6 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
                             onChange={()=>toggleTask(num, t.num, availSubs.map(s=>s.num))} />
                           <span className="text-xs font-medium text-gray-700">Task {t.num} — {t.name}</span>
                         </label>
-                        <div className="pl-6 mt-1 space-y-0.5">
-                          {availSubs.map(s => (
-                            <label key={s.num} className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={taskSel?.has(s.num) || false}
-                                onChange={()=>toggleSub(num, t.num, s.num)} />
-                              <span className="text-xs text-gray-500">{s.name}</span>
-                            </label>
-                          ))}
-                        </div>
                       </div>
                     )
                   })}
@@ -1587,7 +1359,7 @@ export default function CustomMilestonesPage() {
             <h1 className="text-lg font-bold text-gray-900">Milestone Configuration</h1>
             <p className="text-xs text-gray-400">
               {milestones.length > 0
-                ? `${milestones.length} milestone${milestones.length>1?'s':''} active · timelines, status & hours are tracked down to Task / Subtask / Activity level`
+                ? `${milestones.length} milestone${milestones.length>1?'s':''} active · timelines, status & hours are tracked at Task level`
                 : 'No milestones selected — Dashboard and sidebar will show empty until you add some'}
             </p>
           </div>

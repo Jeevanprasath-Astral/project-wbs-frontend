@@ -46,20 +46,18 @@ export default function TimesheetCalendarPage() {
   const [dayEntries, setDayEntries] = useState([])
   const [loadingDay, setLoadingDay] = useState(false)
   const [newEntry, setNewEntry] = useState({ project_id:'', task_name:'', hours_spent:'', buffer_hours:'', work_type:'Billable', notes:'',
-    custom_milestone_id:'', custom_task_id:'', custom_subtask_id:'', activity_id:'' })
+    custom_milestone_id:'', custom_task_id:'' })
   const [savingEntry, setSavingEntry] = useState(false)
   const [editingEntryId, setEditingEntryId] = useState(null)
   const [editHours, setEditHours] = useState('')
   const [editWorkType, setEditWorkType] = useState('Billable')
-  // Cascading Milestone → Task → Subtask → Activity dropdowns inside the Log modal
+  // Cascading Milestone → Task dropdowns inside the Log modal
   const [logMilestones, setLogMilestones] = useState([])
   const [logMilestonesLoading, setLogMilestonesLoading] = useState(false)
   const [logMilestonesError, setLogMilestonesError] = useState(false)
   const pickLogLevel = (k, v) => setNewEntry(f => {
     const n = {...f, [k]: v}
-    if (k === 'custom_milestone_id') { n.custom_task_id=''; n.custom_subtask_id=''; n.activity_id='' }
-    if (k === 'custom_task_id')      { n.custom_subtask_id=''; n.activity_id='' }
-    if (k === 'custom_subtask_id')   { n.activity_id='' }
+    if (k === 'custom_milestone_id') { n.custom_task_id='' }
     return n
   })
 
@@ -89,7 +87,7 @@ export default function TimesheetCalendarPage() {
     if (!userId) { showMsg('Select an employee first to add or edit timesheet entries.', 'error'); return }
     setEntryDay(date)
     setNewEntry({ project_id: projectId || '', task_name: '', hours_spent: '', buffer_hours: '', work_type: 'Billable', notes: '',
-      custom_milestone_id:'', custom_task_id:'', custom_subtask_id:'', activity_id:'' })
+      custom_milestone_id:'', custom_task_id:'' })
     setEditingEntryId(null)
     setLoadingDay(true)
     try {
@@ -121,9 +119,7 @@ export default function TimesheetCalendarPage() {
   const addDayEntry = async () => {
     if (!newEntry.hours_spent) { showMsg('Enter hours worked.', 'error'); return }
     setSavingEntry(true)
-    const level = newEntry.activity_id ? 'Activity'
-                : newEntry.custom_subtask_id ? 'Subtask'
-                : newEntry.custom_task_id ? 'Task'
+    const level = newEntry.custom_task_id ? 'Task'
                 : newEntry.custom_milestone_id ? 'Milestone' : null
     try {
       await api.post('/work-hours', {
@@ -139,11 +135,9 @@ export default function TimesheetCalendarPage() {
         level,
         custom_milestone_id: newEntry.custom_milestone_id ? parseInt(newEntry.custom_milestone_id) : null,
         custom_task_id:      newEntry.custom_task_id      ? parseInt(newEntry.custom_task_id)      : null,
-        custom_subtask_id:   newEntry.custom_subtask_id   ? parseInt(newEntry.custom_subtask_id)   : null,
-        activity_id:         newEntry.activity_id         ? parseInt(newEntry.activity_id)         : null,
       })
       setNewEntry({ project_id: projectId || '', task_name: '', hours_spent: '', buffer_hours: '', work_type: 'Billable', notes: '',
-        custom_milestone_id:'', custom_task_id:'', custom_subtask_id:'', activity_id:'' })
+        custom_milestone_id:'', custom_task_id:'' })
       showMsg('Timesheet entry added ✅')
       refreshDayEntry()
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to add entry', 'error') }
@@ -1346,20 +1340,16 @@ export default function TimesheetCalendarPage() {
                   onChange={e => setNewEntry(f => ({...f,
                     project_id: e.target.value,
                     custom_milestone_id: '', custom_task_id: '',
-                    custom_subtask_id: '', activity_id: ''
                   }))}>
                   <option value="">📋 General (no project)</option>
                   {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                 </select>
 
-                {/* Cascading Milestone → Task → Subtask — always visible */}
+                {/* Cascading Milestone → Task */}
                 {(() => {
                   const selMs  = logMilestones.find(m => String(m.id) === String(newEntry.custom_milestone_id))
-                  const selTsk = selMs?.tasks?.find(t => String(t.id) === String(newEntry.custom_task_id))
-                  const selSub = selTsk?.subtasks?.find(s => String(s.id) === String(newEntry.custom_subtask_id))
                   const msDisabled  = !newEntry.project_id || logMilestonesLoading || logMilestones.length === 0
                   const tskDisabled = !newEntry.custom_milestone_id || !selMs?.tasks?.length
-                  const subDisabled = !newEntry.custom_task_id || !selTsk?.subtasks?.length
                   const msLabel  = !newEntry.project_id ? '🏁 Select a project first'
                                  : logMilestonesLoading ? '⏳ Loading milestones…'
                                  : logMilestonesError ? '⚠️ Could not load milestones'
@@ -1368,9 +1358,6 @@ export default function TimesheetCalendarPage() {
                   const tskLabel = !newEntry.custom_milestone_id ? '📋 Select a milestone first'
                                  : !selMs?.tasks?.length ? '📋 No tasks in milestone'
                                  : '📋 Task (optional)'
-                  const subLabel = !newEntry.custom_task_id ? '🔹 Select a task first'
-                                 : !selTsk?.subtasks?.length ? '🔹 No subtasks in task'
-                                 : '🔹 Subtask (optional)'
                   return (
                     <>
                       {/* Milestone */}
@@ -1378,7 +1365,7 @@ export default function TimesheetCalendarPage() {
                         disabled={msDisabled}
                         onChange={e => setNewEntry(f => ({...f,
                           custom_milestone_id: e.target.value,
-                          custom_task_id: '', custom_subtask_id: '', activity_id: ''
+                          custom_task_id: '',
                         }))}>
                         <option value="">{msLabel}</option>
                         {logMilestones.map(m => (
@@ -1396,30 +1383,12 @@ export default function TimesheetCalendarPage() {
                           const task   = selMs?.tasks?.find(t => String(t.id) === taskId)
                           setNewEntry(f => ({...f,
                             custom_task_id: taskId,
-                            custom_subtask_id: '', activity_id: '',
                             task_name: task ? task.name : f.task_name
                           }))
                         }}>
                         <option value="">{tskLabel}</option>
                         {selMs?.tasks?.map(t => (
                           <option key={t.id} value={String(t.id)}>Task {t.num} — {t.name}</option>
-                        ))}
-                      </select>
-
-                      {/* Subtask */}
-                      <select className="select text-xs h-8 w-full" value={newEntry.custom_subtask_id}
-                        disabled={subDisabled}
-                        onChange={e => {
-                          const subId = e.target.value
-                          const sub   = selTsk?.subtasks?.find(s => String(s.id) === subId)
-                          setNewEntry(f => ({...f,
-                            custom_subtask_id: subId, activity_id: '',
-                            task_name: sub ? sub.name : f.task_name
-                          }))
-                        }}>
-                        <option value="">{subLabel}</option>
-                        {selTsk?.subtasks?.map(s => (
-                          <option key={s.id} value={String(s.id)}>{s.name}</option>
                         ))}
                       </select>
                     </>
