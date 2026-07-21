@@ -1,16 +1,18 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAppStore } from './store'
-// Perf (req 4): only LoginPage/HomePage/AppLayout/GlobalLayout (the shell the
-// user always hits first) are eagerly imported. Every actual page is
-// code-split via React.lazy so its JS chunk is only fetched when that route
-// is opened — cuts the initial bundle and first-load time significantly.
-import LoginPage          from './pages/LoginPage'
-import ForgotPassword     from './pages/ForgotPassword'
-import ResetPassword      from './pages/ResetPassword'
-import HomePage           from './pages/HomePage'
+// All non-shell pages are code-split via React.lazy so their JS is only
+// fetched when the route is first visited — keeps the initial bundle small.
+// AppLayout and GlobalLayout are eagerly loaded because they are the shells
+// that wrap everything and must be available before any route resolves.
 import AppLayout          from './layouts/AppLayout'
 import GlobalLayout       from './layouts/GlobalLayout'
+// Auth pages are lazy too — LoginPage is 600 lines and includes animation
+// code that authenticated users never need in their session bundle.
+const LoginPage       = lazy(() => import('./pages/LoginPage'))
+const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword   = lazy(() => import('./pages/ResetPassword'))
+const HomePage        = lazy(() => import('./pages/HomePage'))
 
 const ProjectsPage          = lazy(() => import('./pages/ProjectsPage'))
 const ProjectSetup          = lazy(() => import('./pages/ProjectSetup'))
