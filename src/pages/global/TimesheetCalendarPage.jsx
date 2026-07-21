@@ -77,7 +77,9 @@ export default function TimesheetCalendarPage() {
     if (!newEntry.project_id) { setLogMilestones([]); setLogMilestonesError(false); return }
     setLogMilestonesLoading(true)
     setLogMilestonesError(false)
-    api.get(`/projects/${newEntry.project_id}/custom-milestones`)
+    // compact=true skips form_fields — Log modal only needs names for the dropdown.
+    // Loading 6000+ form fields just to show a milestone/task name causes OOM crashes.
+    api.get(`/projects/${newEntry.project_id}/custom-milestones?compact=true`)
       .then(r => { setLogMilestones(Array.isArray(r.data) ? r.data : []); setLogMilestonesError(false) })
       .catch(err => { console.error('Milestone load failed:', err); setLogMilestones([]); setLogMilestonesError(true) })
       .finally(() => setLogMilestonesLoading(false))

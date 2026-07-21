@@ -216,11 +216,36 @@ function FormFieldRow({ f, projectId, msId, taskId, onUpdate, isFirst, showSecti
 // ── Task Form Panel — replaces the old Subtask+Question hierarchy ─────────────
 // Shows all form_fields for a Task, grouped by section_name (= former Subtask
 // name). Admins and PMs can add new fields and edit/delete existing ones.
+// Fields are fetched lazily from the API when this panel opens — the initial
+// milestone list load uses compact=true (no form_fields) to prevent OOM crashes.
 function TaskFormPanel({ t, ms, projectId, onUpdate }) {
-  const fields = t.form_fields || []
+  const [fields, setFields] = useState(null)   // null = not yet loaded
+  const [loadingFields, setLoadingFields] = useState(false)
   const [addingField, setAddingField] = useState(false)
   const [newField, setNewField] = useState({ question_text: '', input_type: 'text', section_name: '' })
   const [saving, setSaving] = useState(false)
+
+  // Fetch form fields from API on mount (lazy — avoids loading 6000+ rows upfront)
+  useEffect(() => {
+    const fetchFields = async () => {
+      setLoadingFields(true)
+      try {
+        const res = await api.get(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}/form-fields`)
+        setFields(res.data)
+      } catch(e) { console.error('form-fields load failed', e); setFields([]) }
+      finally { setLoadingFields(false) }
+    }
+    fetchFields()
+  }, [t.id, ms.id, projectId])
+
+  // Refresh only the local fields list (after add/delete) without triggering a
+  // full milestone reload — keeps the panel open and state stable.
+  const refreshFields = async () => {
+    try {
+      const res = await api.get(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}/form-fields`)
+      setFields(res.data)
+    } catch(e) { console.error(e) }
+  }
 
   const saveField = async () => {
     if (!newField.question_text.trim()) return
@@ -230,16 +255,27 @@ function TaskFormPanel({ t, ms, projectId, onUpdate }) {
         question_text: newField.question_text.trim(),
         input_type: newField.input_type,
         section_name: newField.section_name.trim() || null,
-        num: fields.length + 1,
+        num: (fields?.length || 0) + 1,
       })
       setNewField({ question_text: '', input_type: 'text', section_name: '' })
       setAddingField(false)
-      onUpdate()
+      await refreshFields()
+      onUpdate()   // update form_field_count badge in parent
     } catch (e) { console.error(e) }
     finally { setSaving(false) }
   }
 
-  if (fields.length === 0 && !addingField) {
+  if (loadingFields) {
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="text-xs text-gray-400 animate-pulse">Loading form fields…</div>
+      </div>
+    )
+  }
+
+  const safeFields = fields || []
+
+  if (safeFields.length === 0 && !addingField) {
     return (
       <div className="mt-3 pt-3 border-t border-gray-100">
         <div className="text-xs text-gray-400 mb-2 flex items-center gap-1.5">
@@ -254,13 +290,13 @@ function TaskFormPanel({ t, ms, projectId, onUpdate }) {
     <div className="mt-3 pt-3 border-t border-gray-100">
       <div className="text-xs font-semibold text-violet-700 mb-3 flex items-center gap-1.5">
         <span className="w-4 h-4 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px]">2</span>
-        Form <span className="font-normal text-gray-400">({fields.length} field{fields.length!==1?'s':''})</span>
+        Form <span className="font-normal text-gray-400">({safeFields.length} field{safeFields.length!==1?'s':''})</span>
       </div>
 
       {/* Group fields by section_name */}
       {(() => {
         let lastSection = '__NONE__'
-        return fields.map((f, idx) => {
+        return safeFields.map((f, idx) => {
           const secChanged = f.section_name !== lastSection
           if (secChanged) lastSection = f.section_name
           return (
@@ -270,7 +306,7 @@ function TaskFormPanel({ t, ms, projectId, onUpdate }) {
               projectId={projectId}
               msId={ms.id}
               taskId={t.id}
-              onUpdate={onUpdate}
+              onUpdate={async () => { await refreshFields(); onUpdate() }}
               isFirst={idx === 0}
               showSection={secChanged}
             />
@@ -399,9 +435,9 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
               showForm ? 'bg-violet-600 text-white border-violet-600' : 'text-violet-600 border-violet-300 hover:bg-violet-50')}
             title="Show / hide form fields">
             📋 Form
-            {(t.form_fields?.length||0) > 0 &&
+            {(t.form_field_count||0) > 0 &&
               <span className={clsx('text-[10px] px-1 rounded-full', showForm ? 'bg-white/30 text-white' : 'bg-violet-100 text-violet-700')}>
-                {t.form_fields.length}
+                {t.form_field_count}
               </span>}
           </button>
           <button
@@ -743,7 +779,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
   }
 
   const taskCount = ms.tasks?.length||0
-  const fieldCount = ms.tasks?.reduce((a,t)=>a+(t.form_fields?.length||0),0)||0
+  const fieldCount = ms.tasks?.reduce((a,t)=>a+(t.form_field_count||0),0)||0
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fade-up">
@@ -1339,7 +1375,7 @@ export default function CustomMilestonesPage() {
     setLoading(true)
     try {
       const [mRes, tRes, teamRes] = await Promise.all([
-        api.get(`/projects/${id}/custom-milestones`),
+        api.get(`/projects/${id}/custom-milestones?compact=true`),
         api.get(`/projects/${id}/custom-milestones/templates`),
         api.get(`/projects/${id}/team`).catch(() => ({ data: [] })),
       ])
@@ -1361,7 +1397,7 @@ export default function CustomMilestonesPage() {
   // without re-fetching all milestones.
   const updateOneMilestone = async (msId) => {
     try {
-      const res = await api.get(`/projects/${id}/custom-milestones/${msId}`)
+      const res = await api.get(`/projects/${id}/custom-milestones/${msId}?compact=true`)
       setMilestones(prev => prev.map(m => m.id === msId ? res.data : m))
     } catch(e) { console.error('updateOneMilestone failed', e) }
   }
