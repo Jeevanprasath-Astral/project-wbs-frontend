@@ -352,7 +352,8 @@ function FromTemplatePicker({ items, labelKey, onPick, onClose, title }) {
 // which testers found confusing.
 function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
   const [saving, setSaving] = useState(false)
-  const [draft, setDraft] = useState(t)
+  // Bug #1: seed draft from own_estimated_hours so editable field shows the raw stored value
+  const [draft, setDraft] = useState(seedHoursDraft(t))
   const [showTaskMailbox, setShowTaskMailbox] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -458,10 +459,11 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
                 <span className="w-4 h-4 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px]">1</span>
                 Date &amp; Time Management
               </div>
-              <TimelineFields value={draft} onChange={setDraft} team={team} />
+              {/* Bug #1: showHours makes estimated_hours editable at task level */}
+              <TimelineFields value={draft} onChange={setDraft} team={team} showHours />
               <div className="flex items-center gap-2 mt-2">
                 <button onClick={saveTimeline} className="btn btn-primary text-xs py-1 px-2">💾 Save</button>
-                <button onClick={()=>setDraft(t)} className="btn text-xs py-1 px-2">Cancel</button>
+                <button onClick={()=>setDraft(seedHoursDraft(t))} className="btn text-xs py-1 px-2">Cancel</button>
               </div>
             </div>
           )}

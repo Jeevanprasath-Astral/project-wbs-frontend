@@ -117,6 +117,15 @@ export default function TimesheetCalendarPage() {
   }
 
   const addDayEntry = async () => {
+    // Bug #2: Block logging on approved leave dates
+    const approvedLeave = leaves.find(l =>
+      l.status === 'Approved' &&
+      l.date_from <= entryDay &&
+      l.date_to >= entryDay
+    )
+    if (approvedLeave) { showMsg(`Approved ${approvedLeave.leave_type} leave on this date — time logging is not allowed.`, 'error'); return }
+    // Bug #4: Description required only for General tasks (no project)
+    if (!newEntry.project_id && !newEntry.task_name) { showMsg('Description is required for General tasks.', 'error'); return }
     if (!newEntry.hours_spent) { showMsg('Enter hours worked.', 'error'); return }
     setSavingEntry(true)
     const level = newEntry.custom_task_id ? 'Task'
@@ -1335,11 +1344,22 @@ export default function TimesheetCalendarPage() {
               <div className="pt-2 border-t border-gray-100 space-y-2">
                 <div className="text-xs font-medium text-gray-600">➕ Add new entry</div>
 
+                {/* Bug #2: Approved-leave warning — blocks new entries */}
+                {(() => {
+                  const al = leaves.find(l => l.status === 'Approved' && l.date_from <= entryDay && l.date_to >= entryDay)
+                  return al ? (
+                    <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-700">
+                      🌴 You have approved <strong>{al.leave_type}</strong> leave on this date. Time logging is blocked.
+                    </div>
+                  ) : null
+                })()}
+
                 {/* Project */}
                 <select className="select text-xs h-8 w-full" value={newEntry.project_id}
                   onChange={e => setNewEntry(f => ({...f,
                     project_id: e.target.value,
                     custom_milestone_id: '', custom_task_id: '',
+                    ...(e.target.value ? { work_type: 'Billable' } : {}),
                   }))}>
                   <option value="">📋 General (no project)</option>
                   {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
@@ -1395,8 +1415,9 @@ export default function TimesheetCalendarPage() {
                   )
                 })()}
 
-                {/* Description — auto-filled when a task or subtask is picked */}
-                <input className="input text-xs h-8 w-full" placeholder="Description *"
+                {/* Description — required for General (no project), optional otherwise */}
+                <input className="input text-xs h-8 w-full"
+                  placeholder={newEntry.project_id ? 'Description (optional)' : 'Description *'}
                   value={newEntry.task_name}
                   onChange={e => setNewEntry(f => ({...f, task_name: e.target.value}))} />
 
@@ -1404,16 +1425,23 @@ export default function TimesheetCalendarPage() {
                   <input type="number" step="0.5" min="0.5" className="input text-xs h-8" placeholder="Hours *"
                     value={newEntry.hours_spent}
                     onChange={e => setNewEntry(f => ({...f, hours_spent: e.target.value}))} />
-                  <select className="select text-xs h-8" value={newEntry.work_type}
-                    onChange={e => setNewEntry(f => ({...f, work_type: e.target.value}))}>
-                    {WORK_TYPES.map(wt => <option key={wt} value={wt}>{wt}</option>)}
-                  </select>
+                  {/* Bug #5: project selected → pre-fill Billable, hide dropdown */}
+                  {newEntry.project_id ? (
+                    <div className="input text-xs h-8 flex items-center text-emerald-600 bg-emerald-50 border-emerald-200 cursor-default select-none">
+                      💰 Billable
+                    </div>
+                  ) : (
+                    <select className="select text-xs h-8" value={newEntry.work_type}
+                      onChange={e => setNewEntry(f => ({...f, work_type: e.target.value}))}>
+                      {WORK_TYPES.map(wt => <option key={wt} value={wt}>{wt}</option>)}
+                    </select>
+                  )}
                 </div>
                 <input className="input text-xs h-8 w-full" placeholder="Notes (optional)"
                   value={newEntry.notes}
                   onChange={e => setNewEntry(f => ({...f, notes: e.target.value}))} />
                 <button onClick={addDayEntry}
-                  disabled={!newEntry.task_name || !newEntry.hours_spent || savingEntry}
+                  disabled={(!newEntry.project_id && !newEntry.task_name) || !newEntry.hours_spent || savingEntry}
                   className="btn btn-primary text-xs w-full disabled:opacity-50">
                   {savingEntry ? '⟳ Logging…' : '✓ Log Hours'}
                 </button>
