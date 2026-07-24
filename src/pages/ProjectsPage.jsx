@@ -276,6 +276,20 @@ export default function ProjectsPage() {
                                 🏢 {p.client} &nbsp;·&nbsp; 👤 {p.owner}
                                 {p.start_date && <> &nbsp;·&nbsp; 📅 {fmtDate(p.start_date)} → {fmtDate(p.end_date)}</>}
                               </div>
+                              {p.project_type && (
+                                <div className="mt-1">
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                    p.project_type === 'Data Analytics'         ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    p.project_type === 'Application Development'? 'bg-violet-50 text-violet-600 border-violet-100' :
+                                    p.project_type === 'Support'                ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                    p.project_type === 'Implementation'         ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                    p.project_type === 'Business Development'   ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                    'bg-gray-50 text-gray-500 border-gray-100'
+                                  }`}>
+                                    {p.project_type}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
                               {/* Status dropdown */}

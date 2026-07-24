@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import api from '../utils/api'
+import ConfirmModal from './common/ConfirmModal'
 
 const EXT_ICON = ext => {
   const e = (ext || '').toLowerCase().replace('.', '')
@@ -31,6 +32,7 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
   const [uploading, setUploading]     = useState(false)
   const [error, setError]             = useState('')
   const [expanded, setExpanded]       = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
   const fileRef = useRef()
 
   const load = async () => {
@@ -60,12 +62,15 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
     finally { setUploading(false); fileRef.current.value = '' }
   }
 
-  const remove = async (id) => {
-    if (!window.confirm('Delete this attachment?')) return
-    try {
-      await api.delete(`/attachments/${id}`)
-      setAttachments(a => a.filter(x => x.id !== id))
-    } catch { setError('Delete failed') }
+  const remove = (id) => {
+    setConfirmState({
+      onConfirm: async () => {
+        try {
+          await api.delete(`/attachments/${id}`)
+          setAttachments(a => a.filter(x => x.id !== id))
+        } catch { setError('Delete failed') }
+      }
+    })
   }
 
   // URL comes directly from Cloudinary (returned by the backend)
@@ -134,6 +139,16 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmState}
+        title="Delete attachment?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

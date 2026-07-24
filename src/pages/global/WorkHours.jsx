@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useNavigate } from 'react-router-dom'
 import { fmtDate, fmtHours } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -21,6 +22,7 @@ export default function WorkHours() {
   const [showLog, setShowLog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
   const [activeAssignments, setActiveAssignments] = useState([])
   const [teams, setTeams] = useState([])
   const [period, setPeriod] = useState('daily')
@@ -121,10 +123,15 @@ export default function WorkHours() {
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this record?')) return
-    await api.delete(`/work-hours/${id}`)
-    load()
+  const handleDelete = (id) => {
+    setConfirmState({
+      title: 'Delete work hours record?',
+      message: 'This cannot be undone.',
+      onConfirm: async () => {
+        await api.delete(`/work-hours/${id}`)
+        load()
+      }
+    })
   }
 
   return (
@@ -375,5 +382,15 @@ export default function WorkHours() {
 
       {/* Log hours is now centralised in Timesheet Calendar → 🗓️ Log button */}
     </div>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
   )
 }

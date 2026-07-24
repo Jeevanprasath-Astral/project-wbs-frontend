@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useParams } from 'react-router-dom'
 import { fmtDate, fmtDateTime, fmtHours } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -174,6 +175,7 @@ export default function AssignmentsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterTeam, setFilterTeam] = useState('all')
   const [saving, setSaving] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
   const [message, setMessage] = useState(null)
   const [categories, setCategories] = useState([])
   const [showCatModal, setShowCatModal] = useState(false)
@@ -311,14 +313,13 @@ export default function AssignmentsPage() {
     } catch (e) { showMsg('Failed to update status', 'error') }
   }
 
-  const handleDelete = async (aid) => {
-    if (!window.confirm('Delete this assignment?')) return
-    try {
+  const handleDelete = (aid) => {
+    setConfirmState({ title: 'Delete assignment?', message: 'This cannot be undone.', onConfirm: async () => { try {
       await api.delete(`/projects/${id}/assignments/${aid}`)
       setAssignments(prev => prev.filter(a => a.id !== aid))
       showMsg('Assignment deleted')
       load()
-    } catch (e) { showMsg('Failed to delete', 'error') }
+    } catch (e) { showMsg('Failed to delete', 'error') } } })
   }
 
   // Split by tab first — General Tasks vs Milestone Tasks never mix, so the
@@ -679,5 +680,15 @@ export default function AssignmentsPage() {
         </div>
       )}
     </div>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useParams } from 'react-router-dom'
 import { fmtDate, fmtCurrency, COST_CATEGORIES } from '../../utils/helpers'
 import api from '../../utils/api'
@@ -22,6 +23,7 @@ export default function CostManagementPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
   const [budgetEditing, setBudgetEditing] = useState(false)
   const [budgetInput, setBudgetInput] = useState('')
 
@@ -86,13 +88,18 @@ export default function CostManagementPage() {
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (c) => {
-    if (!window.confirm(`Delete cost entry "${c.particulars}"?`)) return
-    try {
-      await api.delete(`/projects/${id}/costs/${c.id}`)
-      showMsg('Cost entry deleted')
-      load()
-    } catch (e) { showMsg(e.response?.data?.detail || 'Failed to delete', 'error') }
+  const handleDelete = (c) => {
+    setConfirmState({
+      title: `Delete cost entry?`,
+      message: `"${c.particulars}" will be permanently removed.`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/projects/${id}/costs/${c.id}`)
+          showMsg('Cost entry deleted')
+          load()
+        } catch (e) { showMsg(e.response?.data?.detail || 'Failed to delete', 'error') }
+      }
+    })
   }
 
   const openBudgetEdit = () => {
@@ -325,5 +332,15 @@ export default function CostManagementPage() {
         </div>
       )}
     </div>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
   )
 }

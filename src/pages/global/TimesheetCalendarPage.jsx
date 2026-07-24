@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { getProjectsList, getUsersList, getProjectCustomMilestones } from '../../utils/masterData'
 import { fmtHours } from '../../utils/helpers'
 import clsx from 'clsx'
@@ -46,7 +47,7 @@ export default function TimesheetCalendarPage() {
   const [dayEntries, setDayEntries] = useState([])
   const [loadingDay, setLoadingDay] = useState(false)
   const [newEntry, setNewEntry] = useState({ project_id:'', task_name:'', hours_spent:'', buffer_hours:'', work_type:'Billable', notes:'',
-    custom_milestone_id:'', custom_task_id:'' })
+    custom_milestone_id:'', custom_task_id:'', milestone_report_id:'' })
   const [savingEntry, setSavingEntry] = useState(false)
   const [editingEntryId, setEditingEntryId] = useState(null)
   const [editHours, setEditHours] = useState('')
@@ -55,6 +56,10 @@ export default function TimesheetCalendarPage() {
   const [logMilestones, setLogMilestones] = useState([])
   const [logMilestonesLoading, setLogMilestonesLoading] = useState(false)
   const [logMilestonesError, setLogMilestonesError] = useState(false)
+  // Req 8 — DA project: flat list of Milestone → Report for the timesheet dropdown
+  const [logReports, setLogReports] = useState([])
+  const [logReportsLoading, setLogReportsLoading] = useState(false)
+  const [logReportsError, setLogReportsError] = useState(false)
   const pickLogLevel = (k, v) => setNewEntry(f => {
     const n = {...f, [k]: v}
     if (k === 'custom_milestone_id') { n.custom_task_id='' }
@@ -75,6 +80,9 @@ export default function TimesheetCalendarPage() {
   // Direct API call (not cached) so we always pick up freshly-added milestones.
   useEffect(() => {
     if (!newEntry.project_id) { setLogMilestones([]); setLogMilestonesError(false); return }
+    const proj = projects.find(p => String(p.id) === String(newEntry.project_id))
+    // For DA projects we load reports instead (see below), skip the milestone tree
+    if (proj?.project_type === 'Data Analytics') { setLogMilestones([]); return }
     setLogMilestonesLoading(true)
     setLogMilestonesError(false)
     // compact=true skips form_fields — Log modal only needs names for the dropdown.
@@ -83,13 +91,26 @@ export default function TimesheetCalendarPage() {
       .then(r => { setLogMilestones(Array.isArray(r.data) ? r.data : []); setLogMilestonesError(false) })
       .catch(err => { console.error('Milestone load failed:', err); setLogMilestones([]); setLogMilestonesError(true) })
       .finally(() => setLogMilestonesLoading(false))
-  }, [newEntry.project_id])
+  }, [newEntry.project_id, projects])
+
+  // Req 8 — load flat report list for DA projects
+  useEffect(() => {
+    if (!newEntry.project_id) { setLogReports([]); return }
+    const proj = projects.find(p => String(p.id) === String(newEntry.project_id))
+    if (proj?.project_type !== 'Data Analytics') { setLogReports([]); return }
+    setLogReportsLoading(true)
+    setLogReportsError(false)
+    api.get(`/projects/${newEntry.project_id}/custom-milestones/milestone-reports-flat`)
+      .then(r => { setLogReports(Array.isArray(r.data) ? r.data : []); setLogReportsError(false) })
+      .catch(err => { console.error('DA reports load failed:', err); setLogReports([]); setLogReportsError(true) })
+      .finally(() => setLogReportsLoading(false))
+  }, [newEntry.project_id, projects])
 
   const openDayEntry = async (date) => {
     if (!userId) { showMsg('Select an employee first to add or edit timesheet entries.', 'error'); return }
     setEntryDay(date)
     setNewEntry({ project_id: projectId || '', task_name: '', hours_spent: '', buffer_hours: '', work_type: 'Billable', notes: '',
-      custom_milestone_id:'', custom_task_id:'' })
+      custom_milestone_id:'', custom_task_id:'', milestone_report_id:'' })
     setEditingEntryId(null)
     setLoadingDay(true)
     try {
@@ -144,11 +165,12 @@ export default function TimesheetCalendarPage() {
         is_billable: newEntry.work_type === 'Billable',
         notes: newEntry.notes || null,
         level,
-        custom_milestone_id: newEntry.custom_milestone_id ? parseInt(newEntry.custom_milestone_id) : null,
-        custom_task_id:      newEntry.custom_task_id      ? parseInt(newEntry.custom_task_id)      : null,
+        custom_milestone_id:  newEntry.custom_milestone_id  ? parseInt(newEntry.custom_milestone_id)  : null,
+        custom_task_id:       newEntry.custom_task_id       ? parseInt(newEntry.custom_task_id)       : null,
+        milestone_report_id:  newEntry.milestone_report_id  ? parseInt(newEntry.milestone_report_id)  : null,  // Req 8
       })
       setNewEntry({ project_id: projectId || '', task_name: '', hours_spent: '', buffer_hours: '', work_type: 'Billable', notes: '',
-        custom_milestone_id:'', custom_task_id:'' })
+        custom_milestone_id:'', custom_task_id:'', milestone_report_id:'' })
       showMsg('Timesheet entry added ✅')
       refreshDayEntry()
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to add entry', 'error') }
@@ -169,12 +191,19 @@ export default function TimesheetCalendarPage() {
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to update entry', 'error') }
   }
 
-  const deleteDayEntry = async (id) => {
-    try {
-      await api.delete(`/work-hours/${id}`)
-      showMsg('Entry deleted')
-      refreshDayEntry()
-    } catch(e) { showMsg(e.response?.data?.detail || 'Failed to delete entry', 'error') }
+  const deleteDayEntry = (id) => {
+    setConfirmState({
+      title: 'Delete entry?',
+      message: 'This will permanently remove this time log entry.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/work-hours/${id}`)
+          showMsg('Entry deleted')
+          refreshDayEntry()
+        } catch(e) { showMsg(e.response?.data?.detail || 'Failed to delete entry', 'error') }
+      }
+    })
   }
 
   const load = async () => {
@@ -213,7 +242,14 @@ export default function TimesheetCalendarPage() {
       load()
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed', 'error') }
   }
-  const deleteHoliday = async (id) => { await api.delete(`/timesheet/holidays/${id}`); load() }
+  const deleteHoliday = (id) => {
+    setConfirmState({
+      title: 'Delete holiday?',
+      message: 'This will permanently remove this holiday entry.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => { await api.delete(`/timesheet/holidays/${id}`); load() }
+    })
+  }
 
   const addLeave = async () => {
     if (!newLeave.date_from || !newLeave.date_to) return
@@ -225,7 +261,14 @@ export default function TimesheetCalendarPage() {
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed', 'error') }
   }
   const updateLeaveStatus = async (id, status) => { await api.patch(`/timesheet/leaves/${id}`, { status }); load() }
-  const deleteLeave = async (id) => { await api.delete(`/timesheet/leaves/${id}`); load() }
+  const deleteLeave = (id) => {
+    setConfirmState({
+      title: 'Delete leave request?',
+      message: 'This will permanently remove this leave record.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => { await api.delete(`/timesheet/leaves/${id}`); load() }
+    })
+  }
 
   const addPermission = async () => {
     if (!newPermission.date || !newPermission.hours) return
@@ -237,7 +280,14 @@ export default function TimesheetCalendarPage() {
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed', 'error') }
   }
   const updatePermissionStatus = async (id, status) => { await api.patch(`/timesheet/permissions/${id}`, { status }); load() }
-  const deletePermission = async (id) => { await api.delete(`/timesheet/permissions/${id}`); load() }
+  const deletePermission = (id) => {
+    setConfirmState({
+      title: 'Delete permission?',
+      message: 'This will permanently remove this permission request.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => { await api.delete(`/timesheet/permissions/${id}`); load() }
+    })
+  }
 
   // ── Report exports ──────────────────────────────────────────────────────
   // Scoped to this tab only (the Month filter above keeps driving the other
@@ -299,6 +349,7 @@ export default function TimesheetCalendarPage() {
   const [trackerExporting, setTrackerExporting] = useState(false)
   const [trackerDailyData, setTrackerDailyData] = useState(null)
   const [trackerDailyLoading, setTrackerDailyLoading] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
   const downloadReport = async (r) => {
     const cols = REPORT_FIELDS[r.fieldsKey].map(([fk]) => fk)
     const { start, end } = reportRanges[r.key]
@@ -1358,17 +1409,56 @@ export default function TimesheetCalendarPage() {
 
                 {/* Project */}
                 <select className="select text-xs h-8 w-full" value={newEntry.project_id}
-                  onChange={e => setNewEntry(f => ({...f,
-                    project_id: e.target.value,
-                    custom_milestone_id: '', custom_task_id: '',
-                    ...(e.target.value ? { work_type: 'Billable' } : {}),
-                  }))}>
+                  onChange={e => {
+                    const pid = e.target.value
+                    // Business Development → Non-Billable; all other project types → Billable
+                    const proj = projects.find(p => String(p.id) === pid)
+                    const autoWorkType = proj?.project_type === 'Business Development' ? 'Non-Billable' : 'Billable'
+                    setNewEntry(f => ({...f,
+                      project_id: pid,
+                      custom_milestone_id: '', custom_task_id: '', milestone_report_id: '',  // Req 8
+                      ...(pid ? { work_type: autoWorkType } : {}),
+                    }))
+                  }}>
                   <option value="">📋 General (no project)</option>
                   {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                 </select>
 
-                {/* Cascading Milestone → Task */}
+                {/* Cascading Milestone → Task (non-DA) or Milestone → Report (DA) */}
                 {(() => {
+                  const proj = projects.find(p => String(p.id) === String(newEntry.project_id))
+                  const isDA = proj?.project_type === 'Data Analytics'
+
+                  if (isDA) {
+                    // Req 8 — DA project: show flat Report dropdown
+                    const rptDisabled = !newEntry.project_id || logReportsLoading
+                    const rptLabel = !newEntry.project_id ? '📊 Select a project first'
+                                   : logReportsLoading ? '⏳ Loading reports…'
+                                   : logReportsError ? '⚠️ Could not load reports'
+                                   : logReports.length === 0 ? '📊 No reports configured'
+                                   : '📊 Report (optional)'
+                    return (
+                      <select className="select text-xs h-8 w-full" value={newEntry.milestone_report_id}
+                        disabled={rptDisabled}
+                        onChange={e => {
+                          const rptId  = e.target.value
+                          const report = logReports.find(r => String(r.id) === rptId)
+                          setNewEntry(f => ({...f,
+                            milestone_report_id: rptId,
+                            task_name: report ? report.report_name : f.task_name,
+                          }))
+                        }}>
+                        <option value="">{rptLabel}</option>
+                        {logReports.map(r => (
+                          <option key={r.id} value={String(r.id)}>
+                            M{String(r.milestone_num).padStart(2,'0')} — {r.report_name}
+                          </option>
+                        ))}
+                      </select>
+                    )
+                  }
+
+                  // Non-DA: existing Milestone → Task cascade
                   const selMs  = logMilestones.find(m => String(m.id) === String(newEntry.custom_milestone_id))
                   const msDisabled  = !newEntry.project_id || logMilestonesLoading || logMilestones.length === 0
                   const tskDisabled = !newEntry.custom_milestone_id || !selMs?.tasks?.length
@@ -1427,10 +1517,15 @@ export default function TimesheetCalendarPage() {
                   <input type="number" step="0.5" min="0.5" className="input text-xs h-8" placeholder="Hours *"
                     value={newEntry.hours_spent}
                     onChange={e => setNewEntry(f => ({...f, hours_spent: e.target.value}))} />
-                  {/* Bug #5: project selected → pre-fill Billable, hide dropdown */}
+                  {/* Project selected → show auto-set work type as read-only badge.
+                      Business Development → Non-Billable; all others → Billable. */}
                   {newEntry.project_id ? (
-                    <div className="input text-xs h-8 flex items-center text-emerald-600 bg-emerald-50 border-emerald-200 cursor-default select-none">
-                      💰 Billable
+                    <div className={`input text-xs h-8 flex items-center cursor-default select-none ${
+                      newEntry.work_type === 'Non-Billable'
+                        ? 'text-gray-500 bg-gray-100 border-gray-200'
+                        : 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                    }`}>
+                      {newEntry.work_type === 'Non-Billable' ? '🚫 Non-Billable' : '💰 Billable'}
                     </div>
                   ) : (
                     <select className="select text-xs h-8" value={newEntry.work_type}
@@ -1452,6 +1547,15 @@ export default function TimesheetCalendarPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title || 'Confirm'}
+        message={confirmState?.message || ''}
+        confirmLabel={confirmState?.confirmLabel || 'Delete'}
+        onConfirm={async () => { await confirmState?.onConfirm?.(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

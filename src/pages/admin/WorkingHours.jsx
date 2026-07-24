@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import { getUsersList, getProjectCustomMilestones } from '../../utils/masterData'
@@ -30,6 +31,7 @@ export default function WorkingHours() {
   const [showLog, setShowLog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
   const [filters, setFilters] = useState({ user_id:'', date_from: daysAgo(30), date_to: today() })
   const [form, setForm] = useState({ assignment_id:'', task_name:'', date: today(), start_time:'', end_time:'', hours_spent:'', assigned_hours:'', buffer_hours:'', buffer_category:'', notes:'',
     custom_milestone_id:'', custom_task_id:'', custom_subtask_id:'', activity_id:'' })
@@ -142,10 +144,15 @@ export default function WorkingHours() {
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (rid) => {
-    if (!window.confirm('Delete this record?')) return
-    await api.delete(`/work-hours/${rid}`)
-    load()
+  const handleDelete = (rid) => {
+    setConfirmState({
+      title: 'Delete work hours record?',
+      message: 'This cannot be undone.',
+      onConfirm: async () => {
+        await api.delete(`/work-hours/${rid}`)
+        load()
+      }
+    })
   }
 
   if (loading && !records.length) return (
@@ -434,5 +441,15 @@ export default function WorkingHours() {
         </div>
       )}
     </div>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
   )
 }

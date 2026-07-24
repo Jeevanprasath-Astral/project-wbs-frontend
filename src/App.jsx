@@ -38,8 +38,10 @@ const ProfitabilityReportPage = lazy(() => import('./pages/global/ProfitabilityR
 const FinancialSettingsPage   = lazy(() => import('./pages/global/FinancialSettingsPage'))
 const TeamUtilizationPage     = lazy(() => import('./pages/global/TeamUtilizationPage'))
 const CostBreakdownPage       = lazy(() => import('./pages/global/CostBreakdownPage'))
-const BillingStatementPage    = lazy(() => import('./pages/global/BillingStatementPage'))
-const AuditLogPage            = lazy(() => import('./pages/global/AuditLogPage'))
+const BillingStatementPage         = lazy(() => import('./pages/global/BillingStatementPage'))
+const MonthlyBillingTrackerPage    = lazy(() => import('./pages/global/MonthlyBillingTrackerPage'))
+const BillingStatusReportPage      = lazy(() => import('./pages/global/BillingStatusReportPage'))
+const AuditLogPage                 = lazy(() => import('./pages/global/AuditLogPage'))
 
 function ProtectedRoute({ children }) {
   const token = useAppStore(s => s.token)
@@ -83,8 +85,10 @@ export default function App() {
           <Route path="profitability"       element={<ProfitabilityReportPage />} />
           <Route path="team-utilization"    element={<TeamUtilizationPage />} />
           <Route path="cost-breakdown"      element={<CostBreakdownPage />} />
-          <Route path="billing-statement"   element={<BillingStatementPage />} />
-          <Route path="financial-settings"  element={<FinancialSettingsPage />} />
+          <Route path="billing-statement"        element={<BillingStatementPage />} />
+          <Route path="monthly-billing-tracker"  element={<MonthlyBillingTrackerPage />} />
+          <Route path="billing-status"           element={<BillingStatusReportPage />} />
+          <Route path="financial-settings"       element={<FinancialSettingsPage />} />
           <Route path="audit-log"           element={<AuditLogPage />} />
         </Route>
 

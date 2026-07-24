@@ -6,6 +6,7 @@ import { getProjectsList, getGlobalTeams, invalidateMasterData } from '../../uti
 import clsx from 'clsx'
 import { useAppStore } from '../../store'
 import { ALL_ROLES, isTeamManager } from '../../utils/permissions'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 const ROLES = ALL_ROLES
 const ROLE_CFG = {
@@ -56,6 +57,7 @@ export default function GlobalTeam() {
   const [removeImpact, setRemoveImpact] = useState(null)   // impact data from /impact endpoint
   const [removeLoading, setRemoveLoading] = useState(false)
   const [removeConfirming, setRemoveConfirming] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)   // { title, message, onConfirm }
 
   // Combined role list: built-in ALL_ROLES + any custom roles from DB
   const allRoles = [...ROLES, ...customRoles.map(r => r.name).filter(n => !ROLES.includes(n))]
@@ -150,14 +152,37 @@ export default function GlobalTeam() {
     finally { setSavingTeam(false) }
   }
 
-  const handleDeactivate = async (u) => {
-    if (!window.confirm(`Deactivate ${u.name}? They will lose access to the system.`)) return
-    try {
-      await api.delete(`/global/team/${u.id}`)
-      showMsg(`${u.name} deactivated`)
-      invalidateMasterData() // users-list cache is now stale
-      load()
-    } catch(e) { showMsg(e.response?.data?.detail || 'Failed', 'error') }
+  const handleDeactivate = (u) => {
+    setConfirmState({
+      title: `Deactivate ${u.name}?`,
+      message: 'They will lose access to the system. You can re-activate them later via Edit.',
+      confirmLabel: 'Deactivate',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/global/team/${u.id}`)
+          showMsg(`${u.name} deactivated`)
+          invalidateMasterData()
+          load()
+        } catch(e) { showMsg(e.response?.data?.detail || 'Failed to deactivate', 'error') }
+      }
+    })
+  }
+
+  const handleReactivate = (u) => {
+    setConfirmState({
+      title: `Re-activate ${u.name}?`,
+      message: 'They will regain access to the system.',
+      confirmLabel: 'Re-activate',
+      danger: false,
+      onConfirm: async () => {
+        try {
+          await api.patch(`/global/team/${u.id}`, { is_active: true })
+          showMsg(`${u.name} re-activated`)
+          invalidateMasterData()
+          load()
+        } catch(e) { showMsg(e.response?.data?.detail || 'Failed to re-activate', 'error') }
+      }
+    })
   }
 
   const openEdit = (u) => {
@@ -419,10 +444,12 @@ export default function GlobalTeam() {
                         className="btn text-xs flex-1 hover:text-violet-600 hover:border-violet-200 py-1.5">
                         ✏️ Edit
                       </button>
-                      {u.is_active && u.id !== currentUser?.id && (
-                        <button onClick={() => handleDeactivate(u)}
-                          className="btn text-xs hover:text-rose-600 hover:border-rose-200 py-1.5 px-2.5">
-                          🚫
+                      {u.id !== currentUser?.id && (
+                        <button
+                          onClick={() => u.is_active ? handleDeactivate(u) : handleReactivate(u)}
+                          title={u.is_active ? 'Deactivate user' : 'Re-activate user'}
+                          className={`btn text-xs py-1.5 px-2.5 ${u.is_active ? 'hover:text-rose-600 hover:border-rose-200' : 'hover:text-green-600 hover:border-green-200'}`}>
+                          {u.is_active ? '🚫' : '✅'}
                         </button>
                       )}
                       {u.id !== currentUser?.id && (
@@ -682,6 +709,17 @@ export default function GlobalTeam() {
           </div>
         </div>
       )}
+
+      {/* Shared confirm modal — replaces window.confirm() for deactivate/reactivate */}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel || 'Confirm'}
+        danger={confirmState?.danger !== false}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

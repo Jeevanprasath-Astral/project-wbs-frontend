@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { useAppStore } from '../../store'
@@ -6,19 +7,14 @@ import { canAccessFinancialSettings } from '../../utils/permissions'
 import clsx from 'clsx'
 
 const BILLING_TYPES = [
-  'Milestone Payment',
-  'New Requirements',
-  'Change Request',
-  'Due Payment',
-  'Overtime Charges',
-  'Additional Scope',
-  'Miscellaneous',
+  'Milestone Payment', 'New Requirements', 'Change Request',
+  'Due Payment', 'Overtime Charges', 'Additional Scope', 'Miscellaneous',
 ]
 
-const today = () => new Date().toISOString().split('T')[0]
-
 const fmtCurrency = (v) =>
-  v ? `₹${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'
+  v != null && v !== '' && !isNaN(Number(v))
+    ? `₹${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+    : '—'
 
 const STATUS_COLORS = {
   'Not Started': 'bg-gray-100 text-gray-600',
@@ -34,12 +30,20 @@ const ROLE_ICONS = {
 }
 
 const EMPTY_ADD_FORM = {
-  date: today(),
-  amount: '',
-  billing_type: 'Milestone Payment',
-  description: '',
-  milestone_id: '',
-  remarks: '',
+  planned_billing_amount: '',
+  actual_billing_date:    '',
+  actual_billing_amount:  '',
+  billing_type:           'Milestone Payment',
+  description:            '',
+  milestone_id:           '',
+  remarks:                '',
+  _planned_date_display:  '',   // UI only — derived from milestone.planned_end
+}
+
+const AUDIT_ACTION_COLORS = {
+  Created: 'bg-emerald-50 text-emerald-700',
+  Updated: 'bg-amber-50 text-amber-700',
+  Deleted: 'bg-rose-50 text-rose-600',
 }
 
 export default function FinancialSettingsPage() {
@@ -72,6 +76,7 @@ export default function FinancialSettingsPage() {
 
   // ── Toast ────────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
   const showToast = (text, type = 'success') => {
     setToast({ text, type })
     setTimeout(() => setToast(null), 3500)
@@ -88,22 +93,34 @@ export default function FinancialSettingsPage() {
     m.role?.toLowerCase().includes(memberSearch.toLowerCase()))
 
   // ── Billing history state ─────────────────────────────────────────────────────
-  const [expanded,        setExpanded]        = useState(new Set())  // Set<project_id>
-  const [billings,        setBillings]        = useState({})         // { pid: [entries] }
-  const [projMilestones,  setProjMilestones]  = useState({})         // { pid: [{id,name,num}] }
-  const [loadingBilling,  setLoadingBilling]  = useState({})         // { pid: bool }
+  const [expanded,       setExpanded]       = useState(new Set())   // Set<project_id>
+  const [billings,       setBillings]       = useState({})          // { pid: [entries] }
+  const [projMilestones, setProjMilestones] = useState({})          // { pid: [{id,name,num,planned_end}] }
+  const [loadingBilling, setLoadingBilling] = useState({})          // { pid: bool }
+  const [activeTab,      setActiveTab]      = useState({})          // { pid: 'entries'|'audit' }
+  const [auditLogs,      setAuditLogs]      = useState({})          // { pid: [log entries] }
+  const [loadingAudit,   setLoadingAudit]   = useState({})          // { pid: bool }
 
   // Add form
-  const [addingFor, setAddingFor] = useState(null)   // project_id or null
+  const [addingFor, setAddingFor] = useState(null)
   const [addForm,   setAddForm]   = useState(EMPTY_ADD_FORM)
   const [addSaving, setAddSaving] = useState(false)
 
-  // Edit entry (inline row)
-  const [editEntry, setEditEntry] = useState(null)  // { id, project_id, date, amount, … }
+  // Edit entry
+  const [editEntry,  setEditEntry]  = useState(null)
   const [editSaving, setEditSaving] = useState(false)
 
+  // Derive per-project billing total (actual if available, else planned)
   const getBillingTotal = (pid) =>
-    (billings[pid] || []).reduce((s, e) => s + (e.amount || 0), 0)
+    (billings[pid] || []).reduce((s, e) =>
+      s + (e.actual_billing_amount != null ? e.actual_billing_amount : (e.planned_billing_amount || 0)), 0)
+
+  // Helper: get planned_end from milestone list for a given milestone_id
+  const getPlannedDateForMilestone = (pid, msId) => {
+    if (!msId) return ''
+    const ms = (projMilestones[pid] || []).find(m => String(m.id) === String(msId))
+    return ms?.planned_end || ''
+  }
 
   const toggleProject = async (pid) => {
     if (expanded.has(pid)) {
@@ -113,6 +130,7 @@ export default function FinancialSettingsPage() {
       return
     }
     setExpanded(prev => new Set([...prev, pid]))
+    setActiveTab(prev => ({ ...prev, [pid]: prev[pid] || 'entries' }))
     if (!billings[pid]) {
       setLoadingBilling(prev => ({ ...prev, [pid]: true }))
       try {
@@ -127,30 +145,44 @@ export default function FinancialSettingsPage() {
     }
   }
 
+  const switchTab = async (pid, tab) => {
+    setActiveTab(prev => ({ ...prev, [pid]: tab }))
+    if (tab === 'audit' && !auditLogs[pid]) {
+      setLoadingAudit(prev => ({ ...prev, [pid]: true }))
+      try {
+        const res = await api.get(`/project-billings/${pid}/audit-log`)
+        setAuditLogs(prev => ({ ...prev, [pid]: res.data }))
+      } catch { setAuditLogs(prev => ({ ...prev, [pid]: [] })) }
+      finally { setLoadingAudit(prev => ({ ...prev, [pid]: false })) }
+    }
+  }
+
   // ── Add form helpers ──────────────────────────────────────────────────────────
   const startAddForm = (pid) => {
     setEditEntry(null)
     setAddingFor(pid)
-    setAddForm({ ...EMPTY_ADD_FORM, date: today() })
+    setAddForm({ ...EMPTY_ADD_FORM })
   }
 
   const cancelAddForm = () => setAddingFor(null)
 
   const submitAddForm = async (pid) => {
-    if (!addForm.date || !addForm.amount) { showToast('Date and Amount are required', 'error'); return }
-    const amount = parseFloat(addForm.amount)
-    if (isNaN(amount) || amount <= 0) { showToast('Enter a valid amount > 0', 'error'); return }
+    const amt = parseFloat(addForm.planned_billing_amount)
+    if (isNaN(amt) || amt < 0) { showToast('Enter a valid planned amount ≥ 0', 'error'); return }
     setAddSaving(true)
     try {
       const res = await api.post(`/project-billings/${pid}`, {
-        date:         addForm.date,
-        amount,
-        billing_type: addForm.billing_type || null,
-        description:  addForm.description  || null,
-        milestone_id: addForm.milestone_id ? parseInt(addForm.milestone_id) : null,
-        remarks:      addForm.remarks      || null,
+        planned_billing_amount: amt,
+        actual_billing_date:    addForm.actual_billing_date    || null,
+        actual_billing_amount:  addForm.actual_billing_amount !== '' ? parseFloat(addForm.actual_billing_amount) : null,
+        billing_type:           addForm.billing_type           || null,
+        description:            addForm.description            || null,
+        milestone_id:           addForm.milestone_id ? parseInt(addForm.milestone_id) : null,
+        remarks:                addForm.remarks                || null,
       })
       setBillings(prev => ({ ...prev, [pid]: [res.data, ...(prev[pid] || [])] }))
+      // Invalidate audit log so it reloads next time
+      setAuditLogs(prev => { const n = { ...prev }; delete n[pid]; return n })
       setAddingFor(null)
       showToast('Billing entry added')
     } catch (e) {
@@ -159,32 +191,36 @@ export default function FinancialSettingsPage() {
   }
 
   // ── Edit entry helpers ────────────────────────────────────────────────────────
-  const startEditEntry = (entry) => {
+  const startEditEntry = (entry, pid) => {
     setAddingFor(null)
-    setEditEntry({ ...entry })
+    setEditEntry({ ...entry, project_id: pid })
   }
 
   const cancelEditEntry = () => setEditEntry(null)
 
   const submitEditEntry = async () => {
     if (!editEntry) return
-    const amount = parseFloat(editEntry.amount)
-    if (isNaN(amount) || amount <= 0) { showToast('Enter a valid amount > 0', 'error'); return }
+    const amt = parseFloat(editEntry.planned_billing_amount)
+    if (isNaN(amt) || amt < 0) { showToast('Enter a valid planned amount ≥ 0', 'error'); return }
     setEditSaving(true)
     try {
       const res = await api.patch(`/project-billings/entry/${editEntry.id}`, {
-        date:         editEntry.date,
-        amount,
-        billing_type: editEntry.billing_type || null,
-        description:  editEntry.description  || null,
-        milestone_id: editEntry.milestone_id ? parseInt(editEntry.milestone_id) : null,
-        remarks:      editEntry.remarks      || null,
+        planned_billing_amount: amt,
+        actual_billing_date:    editEntry.actual_billing_date    || null,
+        actual_billing_amount:  editEntry.actual_billing_amount !== '' && editEntry.actual_billing_amount != null
+                                  ? parseFloat(editEntry.actual_billing_amount) : null,
+        billing_type:           editEntry.billing_type           || null,
+        description:            editEntry.description            || null,
+        milestone_id:           editEntry.milestone_id ? parseInt(editEntry.milestone_id) : null,
+        remarks:                editEntry.remarks                || null,
       })
       const pid = editEntry.project_id
       setBillings(prev => ({
         ...prev,
         [pid]: prev[pid].map(e => e.id === editEntry.id ? res.data : e),
       }))
+      // Invalidate audit log
+      setAuditLogs(prev => { const n = { ...prev }; delete n[pid]; return n })
       setEditEntry(null)
       showToast('Billing entry updated')
     } catch (e) {
@@ -192,26 +228,30 @@ export default function FinancialSettingsPage() {
     } finally { setEditSaving(false) }
   }
 
-  const deleteEntry = async (entryId, pid) => {
-    if (!window.confirm('Delete this billing entry?')) return
-    try {
-      await api.delete(`/project-billings/entry/${entryId}`)
-      setBillings(prev => ({ ...prev, [pid]: prev[pid].filter(e => e.id !== entryId) }))
-      showToast('Entry deleted')
-    } catch (e) {
-      showToast(e.response?.data?.detail || 'Delete failed', 'error')
-    }
+  const deleteEntry = (entryId, pid) => {
+    setConfirmState({
+      title: 'Delete billing entry?',
+      message: 'This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/project-billings/entry/${entryId}`)
+          setBillings(prev => ({ ...prev, [pid]: prev[pid].filter(e => e.id !== entryId) }))
+          setAuditLogs(prev => { const n = { ...prev }; delete n[pid]; return n })
+          showToast('Entry deleted')
+        } catch (e) {
+          showToast(e.response?.data?.detail || 'Delete failed', 'error')
+        }
+      }
+    })
   }
 
   // ── Cost rate inline edit ─────────────────────────────────────────────────────
-  const [rateEditing, setRateEditing] = useState(null)  // { id, value }
+  const [rateEditing, setRateEditing] = useState(null)
   const [rateSaving,  setRateSaving]  = useState(false)
 
   const startRateEdit = (m) =>
     setRateEditing({ id: m.id, value: m.cost_rate == null ? '' : String(m.cost_rate) })
-
   const cancelRateEdit = () => setRateEditing(null)
-
   const saveRateEdit = async () => {
     if (!rateEditing) return
     const val = parseFloat(rateEditing.value)
@@ -229,8 +269,8 @@ export default function FinancialSettingsPage() {
 
   if (!canAccessFinancialSettings(user)) return null
 
-  // ── Shared cell styles ────────────────────────────────────────────────────────
   const tdInput = 'input text-xs h-7 py-0 px-1.5 min-w-0'
+  const NCOLS = 9
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -263,7 +303,9 @@ export default function FinancialSettingsPage() {
         {/* How-to banner */}
         <div className="bg-violet-50 border border-violet-100 rounded-2xl px-5 py-3 text-xs text-violet-800 leading-relaxed">
           <span className="font-semibold">How to use:</span>{' '}
-          Click <strong>▶ on a project row</strong> to expand its billing history. Use <strong>+ Add Entry</strong> to log a new billing, or click ✏️ to edit / 🗑️ to delete an existing entry. The total billed per project flows into the <strong>Profitability Report</strong> as Revenue.
+          Click <strong>▶ on a project row</strong> to expand. Select a <strong>Milestone</strong> to auto-populate the Planned Billing Date.
+          Enter Planned Amount upfront and fill Actual Date + Actual Amount once billing is completed.
+          Switch to the <strong>Audit Log</strong> tab to see every change made.
         </div>
 
         {loading ? (
@@ -277,7 +319,7 @@ export default function FinancialSettingsPage() {
                   <span className="text-xl">💰</span>
                   <div>
                     <div className="text-sm font-semibold text-gray-900">Project Billing History</div>
-                    <div className="text-xs text-gray-400">Track multiple billing entries per project — click a row to expand</div>
+                    <div className="text-xs text-gray-400">Plan vs actual — Planned Date auto-fills from selected milestone</div>
                   </div>
                 </div>
                 <input
@@ -304,10 +346,11 @@ export default function FinancialSettingsPage() {
                       <tr><td colSpan={6} className="text-center py-8 text-gray-400 italic">No projects found</td></tr>
                     )}
                     {filteredProjects.map((p, i) => {
-                      const isExp = expanded.has(p.id)
-                      const entries = billings[p.id] || []
-                      const total = getBillingTotal(p.id)
+                      const isExp     = expanded.has(p.id)
+                      const entries   = billings[p.id] || []
+                      const total     = getBillingTotal(p.id)
                       const isLoading = loadingBilling[p.id]
+                      const tab       = activeTab[p.id] || 'entries'
 
                       return [
                         /* Project summary row */
@@ -346,190 +389,344 @@ export default function FinancialSettingsPage() {
                                   <div className="text-xs text-violet-400 animate-pulse py-4 text-center">Loading billing entries…</div>
                                 ) : (
                                   <>
-                                    {/* Entries table */}
-                                    <div className="rounded-xl border border-violet-100 overflow-hidden bg-white">
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="bg-violet-50 border-b border-violet-100">
-                                            <th className="text-left px-3 py-2 font-medium text-violet-700">Date</th>
-                                            <th className="text-left px-3 py-2 font-medium text-violet-700">Billing Type</th>
-                                            <th className="text-right px-3 py-2 font-medium text-violet-700">Amount (₹)</th>
-                                            <th className="text-left px-3 py-2 font-medium text-violet-700">Description</th>
-                                            <th className="text-left px-3 py-2 font-medium text-violet-700">Milestone</th>
-                                            <th className="text-left px-3 py-2 font-medium text-violet-700">Remarks</th>
-                                            <th className="px-3 py-2 w-20"></th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {entries.length === 0 && addingFor !== p.id && (
-                                            <tr>
-                                              <td colSpan={7} className="text-center py-5 text-gray-400 italic">
-                                                No billing entries yet — click <strong>+ Add Entry</strong> below to start
-                                              </td>
-                                            </tr>
-                                          )}
+                                    {/* Tab bar */}
+                                    <div className="flex items-center gap-1 mb-3">
+                                      {['entries', 'audit'].map(t => (
+                                        <button
+                                          key={t}
+                                          onClick={() => switchTab(p.id, t)}
+                                          className={clsx(
+                                            'text-xs px-3 py-1 rounded-lg font-medium transition-colors',
+                                            tab === t
+                                              ? 'bg-violet-600 text-white'
+                                              : 'bg-white text-gray-500 border border-gray-200 hover:bg-violet-50'
+                                          )}>
+                                          {t === 'entries' ? '📋 Billing Entries' : '📜 Audit Log'}
+                                        </button>
+                                      ))}
+                                    </div>
 
-                                          {entries.map((entry, ei) => {
-                                            const isEditing = editEntry?.id === entry.id
-                                            const milestoneOpts = projMilestones[p.id] || []
-
-                                            if (isEditing) {
-                                              return (
-                                                <tr key={entry.id} className="bg-amber-50 border-b border-amber-100">
-                                                  <td className="px-2 py-1.5">
-                                                    <input type="date" className={tdInput} style={{width:'120px'}}
-                                                      value={editEntry.date || ''}
-                                                      onChange={e => setEditEntry(v => ({ ...v, date: e.target.value }))} />
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
-                                                      value={editEntry.billing_type || ''}
-                                                      onChange={e => setEditEntry(v => ({ ...v, billing_type: e.target.value }))}>
-                                                      {BILLING_TYPES.map(t => <option key={t}>{t}</option>)}
-                                                    </select>
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <input type="number" min="0" step="0.01" className={tdInput} style={{width:'90px'}}
-                                                      value={editEntry.amount}
-                                                      onChange={e => setEditEntry(v => ({ ...v, amount: e.target.value }))} />
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <input type="text" className={tdInput} style={{width:'140px'}}
-                                                      value={editEntry.description || ''}
-                                                      placeholder="Description"
-                                                      onChange={e => setEditEntry(v => ({ ...v, description: e.target.value }))} />
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
-                                                      value={editEntry.milestone_id || ''}
-                                                      onChange={e => setEditEntry(v => ({ ...v, milestone_id: e.target.value }))}>
-                                                      <option value="">None</option>
-                                                      {milestoneOpts.map(m => (
-                                                        <option key={m.id} value={m.id}>M{m.num}: {m.name}</option>
-                                                      ))}
-                                                    </select>
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <input type="text" className={tdInput} style={{width:'120px'}}
-                                                      value={editEntry.remarks || ''}
-                                                      placeholder="Remarks"
-                                                      onChange={e => setEditEntry(v => ({ ...v, remarks: e.target.value }))}
-                                                      onKeyDown={e => { if (e.key === 'Enter') submitEditEntry(); if (e.key === 'Escape') cancelEditEntry() }} />
-                                                  </td>
-                                                  <td className="px-2 py-1.5">
-                                                    <div className="flex items-center gap-1">
-                                                      <button onClick={submitEditEntry} disabled={editSaving}
-                                                        className="text-xs px-2 py-0.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
-                                                        {editSaving ? '…' : '✓'}
-                                                      </button>
-                                                      <button onClick={cancelEditEntry}
-                                                        className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
-                                                    </div>
+                                    {/* ── ENTRIES TAB ─────────────────────────── */}
+                                    {tab === 'entries' && (
+                                      <>
+                                        <div className="rounded-xl border border-violet-100 overflow-hidden bg-white overflow-x-auto">
+                                          <table className="w-full text-xs" style={{minWidth:'900px'}}>
+                                            <thead>
+                                              <tr className="bg-violet-50 border-b border-violet-100">
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Milestone</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Planned Date</th>
+                                                <th className="text-right px-3 py-2 font-medium text-violet-700">Planned Amt (₹)</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Actual Date</th>
+                                                <th className="text-right px-3 py-2 font-medium text-violet-700">Actual Amt (₹)</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Billing Type</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Description</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Remarks</th>
+                                                <th className="px-3 py-2 w-16"></th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {entries.length === 0 && addingFor !== p.id && (
+                                                <tr>
+                                                  <td colSpan={NCOLS} className="text-center py-5 text-gray-400 italic">
+                                                    No billing entries yet — click <strong>+ Add Entry</strong> below
                                                   </td>
                                                 </tr>
-                                              )
-                                            }
+                                              )}
 
-                                            return (
-                                              <tr key={entry.id} className={clsx('border-b border-gray-50 hover:bg-violet-50/20', ei % 2 === 0 ? 'bg-white' : 'bg-slate-50/40')}>
-                                                <td className="px-3 py-2 text-gray-600">{entry.date || '—'}</td>
-                                                <td className="px-3 py-2">
-                                                  <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium text-xs">
-                                                    {entry.billing_type || '—'}
-                                                  </span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmtCurrency(entry.amount)}</td>
-                                                <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
-                                                <td className="px-3 py-2 text-gray-500">{entry.milestone_name || '—'}</td>
-                                                <td className="px-3 py-2 text-gray-400 italic">{entry.remarks || '—'}</td>
-                                                <td className="px-3 py-2">
-                                                  <div className="flex items-center gap-1.5">
-                                                    <button onClick={() => startEditEntry({ ...entry, project_id: p.id })}
-                                                      className="text-violet-400 hover:text-violet-600 transition-colors" title="Edit">✏️</button>
-                                                    <button onClick={() => deleteEntry(entry.id, p.id)}
-                                                      className="text-rose-300 hover:text-rose-500 transition-colors" title="Delete">🗑️</button>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            )
-                                          })}
+                                              {entries.map((entry, ei) => {
+                                                const isEditing     = editEntry?.id === entry.id
+                                                const milestoneOpts = projMilestones[p.id] || []
 
-                                          {/* Add entry form row */}
-                                          {addingFor === p.id && (() => {
-                                            const milestoneOpts = projMilestones[p.id] || []
-                                            return (
-                                              <tr className="bg-emerald-50 border-b border-emerald-100">
-                                                <td className="px-2 py-1.5">
-                                                  <input type="date" className={tdInput} style={{width:'120px'}}
-                                                    value={addForm.date}
-                                                    onChange={e => setAddForm(f => ({ ...f, date: e.target.value }))} />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
-                                                    value={addForm.billing_type}
-                                                    onChange={e => setAddForm(f => ({ ...f, billing_type: e.target.value }))}>
-                                                    {BILLING_TYPES.map(t => <option key={t}>{t}</option>)}
-                                                  </select>
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <input type="number" min="0" step="0.01" className={tdInput} style={{width:'90px'}}
-                                                    value={addForm.amount} placeholder="0.00"
-                                                    onChange={e => setAddForm(f => ({ ...f, amount: e.target.value }))} />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <input type="text" className={tdInput} style={{width:'140px'}}
-                                                    value={addForm.description} placeholder="Description"
-                                                    onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))} />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
-                                                    value={addForm.milestone_id}
-                                                    onChange={e => setAddForm(f => ({ ...f, milestone_id: e.target.value }))}>
-                                                    <option value="">None</option>
-                                                    {milestoneOpts.map(m => (
-                                                      <option key={m.id} value={m.id}>M{m.num}: {m.name}</option>
-                                                    ))}
-                                                  </select>
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <input type="text" className={tdInput} style={{width:'120px'}}
-                                                    value={addForm.remarks} placeholder="Remarks"
-                                                    onChange={e => setAddForm(f => ({ ...f, remarks: e.target.value }))}
-                                                    onKeyDown={e => { if (e.key === 'Enter') submitAddForm(p.id); if (e.key === 'Escape') cancelAddForm() }} />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                  <div className="flex items-center gap-1">
-                                                    <button onClick={() => submitAddForm(p.id)} disabled={addSaving}
-                                                      className="text-xs px-2 py-0.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
-                                                      {addSaving ? '…' : '+ Add'}
-                                                    </button>
-                                                    <button onClick={cancelAddForm}
-                                                      className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            )
-                                          })()}
-                                        </tbody>
-                                      </table>
-                                    </div>
+                                                if (isEditing) {
+                                                  // Derive planned_date for the currently selected milestone
+                                                  const editPbd = getPlannedDateForMilestone(p.id, editEntry.milestone_id)
+                                                    || editEntry.planned_billing_date || '—'
+                                                  return (
+                                                    <tr key={entry.id} className="bg-amber-50 border-b border-amber-100">
+                                                      {/* Milestone */}
+                                                      <td className="px-2 py-1.5">
+                                                        <select
+                                                          className={clsx(tdInput, 'select')} style={{width:'130px'}}
+                                                          value={editEntry.milestone_id || ''}
+                                                          onChange={e => setEditEntry(v => ({ ...v, milestone_id: e.target.value }))}>
+                                                          <option value="">None</option>
+                                                          {milestoneOpts.map(m => (
+                                                            <option key={m.id} value={m.id}>M{m.num}: {m.name}</option>
+                                                          ))}
+                                                        </select>
+                                                      </td>
+                                                      {/* Planned Date — read-only, derived */}
+                                                      <td className="px-2 py-1.5">
+                                                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
+                                                          {editPbd}
+                                                        </span>
+                                                      </td>
+                                                      {/* Planned Amount */}
+                                                      <td className="px-2 py-1.5">
+                                                        <input type="number" min="0" step="0.01"
+                                                          className={tdInput} style={{width:'90px'}}
+                                                          value={editEntry.planned_billing_amount ?? ''}
+                                                          onChange={e => setEditEntry(v => ({ ...v, planned_billing_amount: e.target.value }))} />
+                                                      </td>
+                                                      {/* Actual Date */}
+                                                      <td className="px-2 py-1.5">
+                                                        <input type="date"
+                                                          className={tdInput} style={{width:'115px'}}
+                                                          value={editEntry.actual_billing_date || ''}
+                                                          onChange={e => setEditEntry(v => ({ ...v, actual_billing_date: e.target.value }))} />
+                                                      </td>
+                                                      {/* Actual Amount */}
+                                                      <td className="px-2 py-1.5">
+                                                        <input type="number" min="0" step="0.01"
+                                                          className={tdInput} style={{width:'90px'}}
+                                                          value={editEntry.actual_billing_amount ?? ''}
+                                                          placeholder="—"
+                                                          onChange={e => setEditEntry(v => ({ ...v, actual_billing_amount: e.target.value }))} />
+                                                      </td>
+                                                      {/* Billing Type */}
+                                                      <td className="px-2 py-1.5">
+                                                        <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
+                                                          value={editEntry.billing_type || ''}
+                                                          onChange={e => setEditEntry(v => ({ ...v, billing_type: e.target.value }))}>
+                                                          {BILLING_TYPES.map(t => <option key={t}>{t}</option>)}
+                                                        </select>
+                                                      </td>
+                                                      {/* Description */}
+                                                      <td className="px-2 py-1.5">
+                                                        <input type="text"
+                                                          className={tdInput} style={{width:'140px'}}
+                                                          value={editEntry.description || ''}
+                                                          placeholder="Description"
+                                                          onChange={e => setEditEntry(v => ({ ...v, description: e.target.value }))} />
+                                                      </td>
+                                                      {/* Remarks */}
+                                                      <td className="px-2 py-1.5">
+                                                        <input type="text"
+                                                          className={tdInput} style={{width:'120px'}}
+                                                          value={editEntry.remarks || ''}
+                                                          placeholder="Remarks"
+                                                          onChange={e => setEditEntry(v => ({ ...v, remarks: e.target.value }))}
+                                                          onKeyDown={e => { if (e.key === 'Enter') submitEditEntry(); if (e.key === 'Escape') cancelEditEntry() }} />
+                                                      </td>
+                                                      {/* Actions */}
+                                                      <td className="px-2 py-1.5">
+                                                        <div className="flex items-center gap-1">
+                                                          <button onClick={submitEditEntry} disabled={editSaving}
+                                                            className="text-xs px-2 py-0.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
+                                                            {editSaving ? '…' : '✓'}
+                                                          </button>
+                                                          <button onClick={cancelEditEntry}
+                                                            className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  )
+                                                }
 
-                                    {/* Footer: total + add button */}
-                                    <div className="mt-2.5 flex items-center justify-between">
-                                      <button
-                                        onClick={() => startAddForm(p.id)}
-                                        disabled={addingFor === p.id}
-                                        className="text-xs flex items-center gap-1 text-violet-600 hover:text-violet-800 font-medium disabled:opacity-40 transition-colors">
-                                        <span className="text-base leading-none">+</span> Add Entry
-                                      </button>
-                                      {entries.length > 0 && (
-                                        <div className="text-xs text-gray-500">
-                                          Total billed:{' '}
-                                          <span className="font-bold text-emerald-700">{fmtCurrency(total)}</span>
-                                          <span className="ml-1 text-gray-400">({entries.length} {entries.length === 1 ? 'entry' : 'entries'})</span>
+                                                return (
+                                                  <tr key={entry.id} className={clsx(
+                                                    'border-b border-gray-50 hover:bg-violet-50/20 transition-colors',
+                                                    ei % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
+                                                  )}>
+                                                    <td className="px-3 py-2 text-gray-700 font-medium">{entry.milestone_name || '—'}</td>
+                                                    <td className="px-3 py-2 text-gray-500">{entry.planned_billing_date || '—'}</td>
+                                                    <td className="px-3 py-2 text-right font-semibold text-blue-700">
+                                                      {fmtCurrency(entry.planned_billing_amount)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-gray-500">{entry.actual_billing_date || '—'}</td>
+                                                    <td className="px-3 py-2 text-right font-semibold text-emerald-700">
+                                                      {entry.actual_billing_amount != null ? fmtCurrency(entry.actual_billing_amount) : '—'}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium text-xs">
+                                                        {entry.billing_type || '—'}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
+                                                    <td className="px-3 py-2 text-gray-400 italic">{entry.remarks || '—'}</td>
+                                                    <td className="px-3 py-2">
+                                                      <div className="flex items-center gap-1.5">
+                                                        <button onClick={() => startEditEntry(entry, p.id)}
+                                                          className="text-violet-400 hover:text-violet-600 transition-colors" title="Edit">✏️</button>
+                                                        <button onClick={() => deleteEntry(entry.id, p.id)}
+                                                          className="text-rose-300 hover:text-rose-500 transition-colors" title="Delete">🗑️</button>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                )
+                                              })}
+
+                                              {/* Add entry form row */}
+                                              {addingFor === p.id && (() => {
+                                                const milestoneOpts = projMilestones[p.id] || []
+                                                const addPbd = getPlannedDateForMilestone(p.id, addForm.milestone_id)
+                                                return (
+                                                  <tr className="bg-emerald-50 border-b border-emerald-100">
+                                                    {/* Milestone */}
+                                                    <td className="px-2 py-1.5">
+                                                      <select
+                                                        className={clsx(tdInput, 'select')} style={{width:'130px'}}
+                                                        value={addForm.milestone_id}
+                                                        onChange={e => setAddForm(f => ({ ...f, milestone_id: e.target.value }))}>
+                                                        <option value="">None</option>
+                                                        {milestoneOpts.map(m => (
+                                                          <option key={m.id} value={m.id}>M{m.num}: {m.name}</option>
+                                                        ))}
+                                                      </select>
+                                                    </td>
+                                                    {/* Planned Date — auto-derived, read-only */}
+                                                    <td className="px-2 py-1.5">
+                                                      <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md whitespace-nowrap">
+                                                        {addPbd || 'Select milestone'}
+                                                      </span>
+                                                    </td>
+                                                    {/* Planned Amount */}
+                                                    <td className="px-2 py-1.5">
+                                                      <input type="number" min="0" step="0.01"
+                                                        className={tdInput} style={{width:'90px'}}
+                                                        value={addForm.planned_billing_amount} placeholder="0.00"
+                                                        onChange={e => setAddForm(f => ({ ...f, planned_billing_amount: e.target.value }))} />
+                                                    </td>
+                                                    {/* Actual Date */}
+                                                    <td className="px-2 py-1.5">
+                                                      <input type="date"
+                                                        className={tdInput} style={{width:'115px'}}
+                                                        value={addForm.actual_billing_date}
+                                                        onChange={e => setAddForm(f => ({ ...f, actual_billing_date: e.target.value }))} />
+                                                    </td>
+                                                    {/* Actual Amount */}
+                                                    <td className="px-2 py-1.5">
+                                                      <input type="number" min="0" step="0.01"
+                                                        className={tdInput} style={{width:'90px'}}
+                                                        value={addForm.actual_billing_amount} placeholder="—"
+                                                        onChange={e => setAddForm(f => ({ ...f, actual_billing_amount: e.target.value }))} />
+                                                    </td>
+                                                    {/* Billing Type */}
+                                                    <td className="px-2 py-1.5">
+                                                      <select className={clsx(tdInput, 'select')} style={{width:'130px'}}
+                                                        value={addForm.billing_type}
+                                                        onChange={e => setAddForm(f => ({ ...f, billing_type: e.target.value }))}>
+                                                        {BILLING_TYPES.map(t => <option key={t}>{t}</option>)}
+                                                      </select>
+                                                    </td>
+                                                    {/* Description */}
+                                                    <td className="px-2 py-1.5">
+                                                      <input type="text"
+                                                        className={tdInput} style={{width:'140px'}}
+                                                        value={addForm.description} placeholder="Description"
+                                                        onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))} />
+                                                    </td>
+                                                    {/* Remarks */}
+                                                    <td className="px-2 py-1.5">
+                                                      <input type="text"
+                                                        className={tdInput} style={{width:'120px'}}
+                                                        value={addForm.remarks} placeholder="Remarks"
+                                                        onChange={e => setAddForm(f => ({ ...f, remarks: e.target.value }))}
+                                                        onKeyDown={e => { if (e.key === 'Enter') submitAddForm(p.id); if (e.key === 'Escape') cancelAddForm() }} />
+                                                    </td>
+                                                    {/* Actions */}
+                                                    <td className="px-2 py-1.5">
+                                                      <div className="flex items-center gap-1">
+                                                        <button onClick={() => submitAddForm(p.id)} disabled={addSaving}
+                                                          className="text-xs px-2 py-0.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+                                                          {addSaving ? '…' : '+ Add'}
+                                                        </button>
+                                                        <button onClick={cancelAddForm}
+                                                          className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                )
+                                              })()}
+                                            </tbody>
+                                          </table>
                                         </div>
-                                      )}
-                                    </div>
+
+                                        {/* Footer: add + total */}
+                                        <div className="mt-2.5 flex items-center justify-between">
+                                          <button
+                                            onClick={() => startAddForm(p.id)}
+                                            disabled={addingFor === p.id}
+                                            className="text-xs flex items-center gap-1 text-violet-600 hover:text-violet-800 font-medium disabled:opacity-40 transition-colors">
+                                            <span className="text-base leading-none">+</span> Add Entry
+                                          </button>
+                                          {entries.length > 0 && (
+                                            <div className="text-xs text-gray-500 flex items-center gap-3">
+                                              <span>
+                                                Planned:{' '}
+                                                <span className="font-bold text-blue-700">
+                                                  {fmtCurrency(entries.reduce((s, e) => s + (e.planned_billing_amount || 0), 0))}
+                                                </span>
+                                              </span>
+                                              <span>
+                                                Actual:{' '}
+                                                <span className="font-bold text-emerald-700">
+                                                  {fmtCurrency(entries.reduce((s, e) => s + (e.actual_billing_amount || 0), 0))}
+                                                </span>
+                                              </span>
+                                              <span className="text-gray-400">
+                                                ({entries.length} {entries.length === 1 ? 'entry' : 'entries'})
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* ── AUDIT LOG TAB ───────────────────────── */}
+                                    {tab === 'audit' && (
+                                      loadingAudit[p.id] ? (
+                                        <div className="text-xs text-violet-400 animate-pulse py-4 text-center">Loading audit log…</div>
+                                      ) : (
+                                        <div className="rounded-xl border border-violet-100 overflow-hidden bg-white overflow-x-auto">
+                                          <table className="w-full text-xs" style={{minWidth:'700px'}}>
+                                            <thead>
+                                              <tr className="bg-violet-50 border-b border-violet-100">
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Action</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Changed By</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Changed At</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Milestone</th>
+                                                <th className="text-right px-3 py-2 font-medium text-violet-700">Planned Amt</th>
+                                                <th className="text-right px-3 py-2 font-medium text-violet-700">Actual Amt</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Billing Type</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {(auditLogs[p.id] || []).length === 0 ? (
+                                                <tr>
+                                                  <td colSpan={7} className="text-center py-5 text-gray-400 italic">No audit entries yet</td>
+                                                </tr>
+                                              ) : (auditLogs[p.id] || []).map((log, li) => (
+                                                <tr key={log.id} className={clsx(
+                                                  'border-b border-gray-50',
+                                                  li % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
+                                                )}>
+                                                  <td className="px-3 py-2">
+                                                    <span className={clsx('px-1.5 py-0.5 rounded-md text-xs font-semibold',
+                                                      AUDIT_ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-600')}>
+                                                      {log.action}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-3 py-2 text-gray-700">{log.changed_by}</td>
+                                                  <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                                                    {log.changed_at ? log.changed_at.replace('T', ' ').slice(0, 19) : '—'}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-gray-600">{log.snapshot?.milestone_name || '—'}</td>
+                                                  <td className="px-3 py-2 text-right text-blue-700 font-medium">
+                                                    {fmtCurrency(log.snapshot?.planned_billing_amount)}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-right text-emerald-700 font-medium">
+                                                    {log.snapshot?.actual_billing_amount != null
+                                                      ? fmtCurrency(log.snapshot.actual_billing_amount) : '—'}
+                                                  </td>
+                                                  <td className="px-3 py-2 text-gray-500">{log.snapshot?.billing_type || '—'}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -590,17 +787,14 @@ export default function FinancialSettingsPage() {
                             {m.name}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600">
-                          {ROLE_ICONS[m.role] || '👤'} {m.role}
-                        </td>
+                        <td className="px-4 py-2.5 text-gray-600">{ROLE_ICONS[m.role] || '👤'} {m.role}</td>
                         <td className="px-4 py-2.5 text-gray-500">{m.team_name || '—'}</td>
                         <td className="px-4 py-2.5">
                           {rateEditing?.id === m.id ? (
                             <div className="flex items-center gap-1">
                               <span className="text-gray-400 text-xs">₹</span>
                               <input
-                                autoFocus
-                                type="number" min="0" step="0.01"
+                                autoFocus type="number" min="0" step="0.01"
                                 className="input text-xs h-7 w-28 py-0"
                                 value={rateEditing.value}
                                 onChange={e => setRateEditing(prev => ({ ...prev, value: e.target.value }))}
@@ -610,7 +804,8 @@ export default function FinancialSettingsPage() {
                                 className="text-xs px-2 py-0.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
                                 {rateSaving ? '…' : '✓'}
                               </button>
-                              <button onClick={cancelRateEdit} className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+                              <button onClick={cancelRateEdit}
+                                className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
                             </div>
                           ) : (
                             <button
@@ -638,5 +833,15 @@ export default function FinancialSettingsPage() {
         )}
       </div>
     </div>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
   )
 }

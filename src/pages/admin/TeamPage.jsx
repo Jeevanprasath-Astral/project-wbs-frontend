@@ -4,6 +4,7 @@ import api from '../../utils/api'
 import clsx from 'clsx'
 import { useAppStore } from '../../store'
 import { ALL_ROLES, isTeamManager } from '../../utils/permissions'
+import ConfirmModal from '../../components/common/ConfirmModal'
 
 const ROLES = ALL_ROLES
 
@@ -43,6 +44,7 @@ export default function TeamPage() {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
 
   const load = async () => {
     try {
@@ -98,15 +100,21 @@ export default function TeamPage() {
     }
   }
 
-  const handleRemove = async (memberId, name) => {
-    if (!window.confirm(`Remove ${name} from this project?`)) return
-    try {
-      await api.delete(`/projects/${id}/team/${memberId}`)
-      showMsg(`${name} removed from project`)
-      load()
-    } catch (e) {
-      showMsg('Failed to remove member', 'error')
-    }
+  const handleRemove = (memberId, name) => {
+    setConfirmState({
+      title: `Remove ${name}?`,
+      message: 'They will be removed from this project. Their account and other project memberships are not affected.',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/projects/${id}/team/${memberId}`)
+          showMsg(`${name} removed from project`)
+          load()
+        } catch (e) {
+          showMsg(e.response?.data?.detail || 'Failed to remove member', 'error')
+        }
+      }
+    })
   }
 
   if (loading) return (
@@ -277,6 +285,16 @@ export default function TeamPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel || 'Confirm'}
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

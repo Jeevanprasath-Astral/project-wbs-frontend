@@ -11,6 +11,7 @@ const PROJECT_TYPES = [
   'Application Development',
   'Support',
   'Implementation',
+  'Business Development',
 ]
 const PROJECT_CATEGORIES = ['Billable', 'Non-Billable', 'R&D']
 

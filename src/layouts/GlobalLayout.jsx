@@ -18,7 +18,9 @@ const REPORT_NAV = [
   { icon: '💹', label: 'Profitability',     path: '/global/profitability' },
   { icon: '⏰', label: 'Team Utilization',      path: '/global/team-utilization' },
   { icon: '💰', label: 'Cost Breakdown',    path: '/global/cost-breakdown' },
-  { icon: '🧾', label: 'Billing Statement', path: '/global/billing-statement' },
+  { icon: '🧾', label: 'Billing Statement',       path: '/global/billing-statement' },
+  { icon: '📆', label: 'Monthly Billing Tracker', path: '/global/monthly-billing-tracker' },
+  { icon: '📊', label: 'Billing Status',          path: '/global/billing-status' },
 ]
 
 const SETTINGS_NAV = [

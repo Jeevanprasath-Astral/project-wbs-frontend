@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import AttachmentPanel from '../../components/AttachmentPanel'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useAppStore } from '../../store'
 import { fmtHours } from '../../utils/helpers'
 import clsx from 'clsx'
@@ -156,6 +157,7 @@ function FormFieldRow({ f, projectId, msId, taskId, onUpdate, isFirst, showSecti
   const [answer, setAnswer] = useState(f.response || '')
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
 
   const saveAnswer = async () => {
     await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`, { response: answer })
@@ -165,10 +167,13 @@ function FormFieldRow({ f, projectId, msId, taskId, onUpdate, isFirst, showSecti
     await api.patch(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`, textDraft)
     setEditingText(false)
   }
-  const del = async () => {
-    if (!window.confirm('Delete this form field?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`)
-    onUpdate()
+  const del = () => {
+    setConfirmState({
+      onConfirm: async () => {
+        await api.delete(`/projects/${projectId}/custom-milestones/${msId}/tasks/${taskId}/form-fields/${f.id}`)
+        onUpdate()
+      }
+    })
   }
 
   return (
@@ -209,6 +214,15 @@ function FormFieldRow({ f, projectId, msId, taskId, onUpdate, isFirst, showSecti
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={!!confirmState}
+        title="Delete form field?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </>
   )
 }
@@ -397,6 +411,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
   const [noteText, setNoteText] = useState(t.notes || '')
   const [savingNote, setSavingNote] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
 
   const saveNote = async () => {
     setSavingNote(true)
@@ -407,10 +422,13 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
     } finally { setSavingNote(false) }
   }
 
-  const delTask = async () => {
-    if (!window.confirm('Delete this task and all its form fields?')) return
-    await api.delete(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`)
-    onUpdate()
+  const delTask = () => {
+    setConfirmState({
+      onConfirm: async () => {
+        await api.delete(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`)
+        onUpdate()
+      }
+    })
   }
   const saveTimeline = async () => {
     await api.patch(`/projects/${projectId}/custom-milestones/${ms.id}/tasks/${t.id}`, draft)
@@ -514,6 +532,15 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
           team={team} onClose={() => setShowTaskMailbox(false)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title="Delete task?"
+        message="This will also delete all form fields under this task. Cannot be undone."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }
@@ -681,12 +708,236 @@ function MailboxModal({ projectId, type, entityId, msId, entityName, team, onClo
   )
 }
 
+// ── Report row — editable row for a MilestoneReport (Req 7: DA project mode) ──
+// Shows report fields inline; when isDA=true adds Planned / Actual hours columns.
+function ReportRow({ r, projectId, msId, onUpdate, team, isDA }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({ ...r, due_date: r.due_date ? String(r.due_date).slice(0,10) : '' })
+  const [saving, setSaving] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.patch(`/projects/${projectId}/custom-milestones/${msId}/reports/${r.id}`, {
+        status:        draft.status,
+        assigned_to:   draft.assigned_to,
+        due_date:      draft.due_date || null,
+        planned_hours: isDA ? (parseFloat(draft.planned_hours) || 0) : undefined,
+      })
+      setEditing(false)
+      onUpdate()
+    } finally { setSaving(false) }
+  }
+
+  const del = () => {
+    setConfirmState({
+      onConfirm: async () => {
+        await api.delete(`/projects/${projectId}/custom-milestones/${msId}/reports/${r.id}`)
+        onUpdate()
+      }
+    })
+  }
+
+  return (
+    <div className="mb-2 p-3 bg-white rounded-xl border border-violet-100">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-violet-700 flex-shrink-0">{r.report_number}</span>
+        <span className="text-xs font-medium text-gray-800 flex-1">{r.report_name}</span>
+        {r.department && <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded">{r.department}</span>}
+        <span className={clsx('text-[10px] px-1.5 py-0.5 rounded',
+          r.status === 'Completed' ? 'bg-emerald-50 text-emerald-600'
+          : r.status === 'In Progress' ? 'bg-amber-50 text-amber-600'
+          : 'bg-gray-100 text-gray-500')}>
+          {r.status}
+        </span>
+        {r.assigned_to && <span className="text-[10px] text-gray-400 hidden sm:inline">👤 {r.assigned_to}</span>}
+        <button onClick={() => setEditing(v => !v)} className={clsx('btn text-xs py-0.5 px-1.5', editing && 'text-violet-600 border-violet-200 bg-violet-50')} title="Edit">✏️</button>
+        <button onClick={del} className="btn text-xs py-0.5 px-1.5 hover:text-rose-600" title="Delete">🗑️</button>
+      </div>
+
+      {/* DA mode: planned vs actual hours chip */}
+      {isDA && (
+        <div className="flex items-center gap-4 mt-1.5">
+          <span className="text-xs text-gray-400">Planned: <span className="font-semibold text-violet-700">{fmtHours(r.planned_hours ?? 0)}</span></span>
+          <span className="text-xs text-gray-400">Actual: <span className="font-semibold text-emerald-600">{fmtHours(r.actual_hours ?? 0)}</span></span>
+          {(r.actual_hours > 0 && r.planned_hours > 0) && (
+            <span className={clsx('text-[10px] font-medium px-1.5 py-0.5 rounded',
+              r.actual_hours <= r.planned_hours ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}>
+              {r.actual_hours <= r.planned_hours ? '✅ On Track' : `⚠️ +${fmtHours(r.actual_hours - r.planned_hours)} over`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div className="mt-2 pt-2 border-t border-violet-100 grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs text-gray-400 mb-0.5">Status</label>
+            <select className="select text-xs h-7 w-full" value={draft.status || 'Not Started'}
+              onChange={e => setDraft({...draft, status: e.target.value})}>
+              {STATUSES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-0.5">Assigned To</label>
+            {team?.length > 0 ? (
+              <select className="select text-xs h-7 w-full" value={draft.assigned_to || ''}
+                onChange={e => setDraft({...draft, assigned_to: e.target.value})}>
+                <option value="">— Unassigned —</option>
+                {team.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            ) : (
+              <input className="input text-xs h-7 w-full" value={draft.assigned_to || ''}
+                onChange={e => setDraft({...draft, assigned_to: e.target.value})} placeholder="Name" />
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-0.5">Due Date</label>
+            <input type="date" className="input text-xs h-7 w-full" value={draft.due_date || ''}
+              onChange={e => setDraft({...draft, due_date: e.target.value})} />
+          </div>
+          {isDA && (
+            <div>
+              <label className="block text-xs text-gray-400 mb-0.5">Planned Hours</label>
+              <input type="number" min="0" step="0.5" className="input text-xs h-7 w-full"
+                value={draft.planned_hours ?? ''}
+                onChange={e => setDraft({...draft, planned_hours: e.target.value})}
+                placeholder="0" />
+            </div>
+          )}
+          <div className="col-span-2 sm:col-span-3 flex items-center gap-2 mt-1">
+            <button onClick={save} disabled={saving} className="btn btn-primary text-xs py-1 px-2">
+              {saving ? '⟳ Saving…' : '💾 Save'}
+            </button>
+            <button onClick={() => { setDraft({...r, due_date: r.due_date ? String(r.due_date).slice(0,10) : ''}); setEditing(false) }}
+              className="btn text-xs py-1 px-2">Cancel</button>
+          </div>
+        </div>
+      )}
+      <ConfirmModal
+        open={!!confirmState}
+        title="Delete report?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
+    </div>
+  )
+}
+
+
+// ── Batch Picker Modal — for assigning master reports to a milestone batch ─────
+// Shows project-level master reports, filters out already-assigned ones for
+// this milestone, and allows multi-select before adding as a new batch.
+function BatchPicker({ projectId, msId, projectReports, alreadyAssigned, onClose, onAdded }) {
+  // alreadyAssigned: array of project_report_id values already in this milestone
+  const assignedSet = new Set((alreadyAssigned || []).map(id => Number(id)))
+  const available = (projectReports || []).filter(r => !assignedSet.has(r.id))
+  const [selected, setSelected] = useState(new Set())
+  const [adding, setAdding] = useState(false)
+  const [err, setErr] = useState('')
+
+  const toggle = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const assign = async () => {
+    if (selected.size === 0) return
+    setAdding(true); setErr('')
+    try {
+      await api.post(`/projects/${projectId}/custom-milestones/${msId}/reports/batch`, {
+        project_report_ids: [...selected],
+      })
+      onAdded()
+      onClose()
+    } catch(e) {
+      setErr(e.response?.data?.detail || 'Failed to assign batch')
+    } finally { setAdding(false) }
+  }
+
+  // Multi-column layout: max 10 reports per column
+  const CHUNK = 10
+  const columns = []
+  for (let i = 0; i < available.length; i += CHUNK) {
+    columns.push(available.slice(i, i + CHUNK))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-gray-900 text-sm">Select Reports for New Batch</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Choose from the project master list. Each batch is one processing pass.</p>
+          </div>
+          <button onClick={onClose} className="btn text-xs py-1 px-2">✕ Close</button>
+        </div>
+
+        {available.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-400">
+            All master reports are already assigned to this milestone.
+          </div>
+        ) : (
+          <div className="p-5">
+            <div className="flex gap-6 max-h-[60vh] overflow-y-auto">
+              {columns.map((col, ci) => (
+                <div key={ci} className="flex-1 min-w-0">
+                  {col.map(r => (
+                    <label key={r.id} className={clsx(
+                      'flex items-center gap-2.5 p-2.5 rounded-xl border mb-1.5 cursor-pointer transition-colors',
+                      selected.has(r.id) ? 'bg-violet-50 border-violet-300' : 'bg-white border-gray-100 hover:border-violet-200'
+                    )}>
+                      <input type="checkbox" className="accent-violet-600" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-violet-700">{r.report_number}</div>
+                        <div className="text-xs text-gray-700 truncate">{r.report_name}</div>
+                        {r.department && <div className="text-[10px] text-gray-400">{r.department}</div>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {err && <div className="mt-3 text-xs text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-xl">{err}</div>}
+
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+              <span className="text-xs text-gray-400">{selected.size} report{selected.size !== 1 ? 's' : ''} selected</span>
+              <div className="flex items-center gap-2">
+                <button onClick={onClose} className="btn text-xs py-1.5 px-3">Cancel</button>
+                <button
+                  onClick={assign}
+                  disabled={adding || selected.size === 0}
+                  className="btn btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
+                >
+                  {adding ? '⟳ Adding…' : `➕ Add as New Batch (${selected.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
 // ── Milestone card ─────────────────────────────────────────────────────────────
 // `forceOpen` (set when this card is shown via its own dedicated tab in the
 // Milestone Configuration tab strip, instead of the "All milestones" list
 // view) skips the extra click needed to expand it, since in tab view this is
 // the only milestone on screen anyway.
-function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
+// `isDA` — when true (Data Analytics project), shows only the Reports panel
+// (with planned_hours) and hides the Tasks / Form Fields panels.
+// `projectReports` — master catalogue of DA project reports (passed from parent)
+function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen, isDA, projectReports }) {
   const [open, setOpen] = useState(!!forceOpen)
   const [addTask, setAddTask] = useState(false)
   const [newTask, setNewTask] = useState({ name:'', responsibility:'' })
@@ -705,7 +956,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
   const [activeTaskId, setActiveTaskId] = useState(null)
   // Milestone-level Reports state
   const [addingReport, setAddingReport] = useState(false)
-  const [newReport, setNewReport] = useState({ report_number: '', report_name: '', department: '', status: 'Not Started', assigned_to: '', due_date: '' })
+  const [newReport, setNewReport] = useState({ report_number: '', report_name: '', department: '', status: 'Not Started', assigned_to: '', due_date: '', planned_hours: '' })
   const [reportError, setReportError] = useState('')
   // Report Templates state
   const [templates, setTemplates] = useState([])
@@ -713,6 +964,9 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
+  // DA Batch Picker state
+  const [showBatchPicker, setShowBatchPicker] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
 
   const saveTask = async () => {
     if (!newTask.name) return
@@ -748,8 +1002,11 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
     if (!newReport.report_number.trim() || !newReport.report_name.trim()) return
     setReportError('')
     try {
-      await api.post(`/projects/${projectId}/custom-milestones/${ms.id}/reports`, newReport)
-      setNewReport({ report_number: '', report_name: '', department: '', status: 'Not Started', assigned_to: '', due_date: '' })
+      await api.post(`/projects/${projectId}/custom-milestones/${ms.id}/reports`, {
+        ...newReport,
+        planned_hours: isDA ? (parseFloat(newReport.planned_hours) || 0) : undefined,
+      })
+      setNewReport({ report_number: '', report_name: '', department: '', status: 'Not Started', assigned_to: '', due_date: '', planned_hours: '' })
       setAddingReport(false); onUpdate()
     } catch (e) { setReportError(e.response?.data?.detail || 'Failed to add report') }
   }
@@ -845,137 +1102,103 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
       {open && (
         <div className="border-t border-gray-100 p-4">
 
-          {/* ── Reports section (hidden from UI; backend data preserved) ── */}
-          {false && <div className="mb-4 pb-4 border-b border-gray-100 hidden-reports-section">
-            <div className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5 flex-wrap">
-              <span>📄</span> Reports <span className="text-gray-400 font-normal">(optional)</span>
-              {ms.reports?.length > 0 && (
-                <span className="ml-1 bg-violet-50 text-violet-600 text-[10px] px-1.5 py-0.5 rounded-md font-medium">{ms.reports.length}</span>
-              )}
-              <div className="ml-auto flex items-center gap-1.5">
-                {ms.reports?.length > 0 && (
-                  <button
-                    onClick={()=>{ setShowSaveTemplate(s=>!s); setShowTemplatePicker(false) }}
-                    className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-0.5 hover:bg-emerald-100 font-medium"
-                  >💾 Save as Template</button>
-                )}
-                <button
-                  onClick={()=>{ setShowTemplatePicker(s=>!s); setShowSaveTemplate(false); if(!showTemplatePicker) loadTemplates() }}
-                  className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2 py-0.5 hover:bg-violet-100 font-medium"
-                >📋 Apply Template</button>
-              </div>
-            </div>
+          {/* ── DA Reports: Batch-grouped view (Data Analytics projects only) ── */}
+          {isDA && (() => {
+            // Group reports by batch_number
+            const batchMap = {}
+            ;(ms.reports || []).forEach(r => {
+              const b = r.batch_number ?? 1
+              if (!batchMap[b]) batchMap[b] = []
+              batchMap[b].push(r)
+            })
+            const batchNums = Object.keys(batchMap).map(Number).sort((a,b)=>a-b)
+            const alreadyAssignedPrIds = (ms.reports || []).map(r => r.project_report_id).filter(Boolean)
 
-            {/* Save as Template form */}
-            {showSaveTemplate && (
-              <div className="mb-2 p-2 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-2">
-                <input
-                  className="input text-xs h-7 flex-1"
-                  placeholder="Template name…"
-                  value={templateName}
-                  onChange={e=>setTemplateName(e.target.value)}
-                  autoFocus
-                />
-                <button
-                  onClick={saveAsTemplate}
-                  disabled={savingTemplate || !templateName.trim()}
-                  className="btn btn-primary text-xs py-1 px-2 disabled:opacity-50"
-                >{savingTemplate ? '…' : '✓ Save'}</button>
-                <button onClick={()=>{ setShowSaveTemplate(false); setTemplateName('') }} className="btn text-xs py-1 px-2">✕</button>
-              </div>
-            )}
-
-            {/* Apply Template picker */}
-            {showTemplatePicker && (
-              <div className="mb-2 p-2 bg-violet-50 rounded-xl border border-violet-200">
-                {templates.length === 0
-                  ? <p className="text-xs text-gray-400">No templates saved yet. Save one from a milestone that already has reports.</p>
-                  : templates.map(t => (
-                    <div key={t.id} className="flex items-center justify-between py-1 border-b border-violet-100 last:border-0">
-                      <div>
-                        <span className="text-xs font-medium text-violet-800">{t.name}</span>
-                        {t.description && <span className="text-[10px] text-gray-400 ml-1.5">{t.description}</span>}
-                        <span className="text-[10px] text-gray-400 ml-1.5">({t.items?.length ?? 0} reports)</span>
-                      </div>
-                      <button
-                        onClick={()=>applyTemplate(t)}
-                        className="text-[10px] text-violet-700 bg-violet-100 border border-violet-200 rounded-lg px-2 py-0.5 hover:bg-violet-200 font-medium ml-2"
-                      >Apply</button>
-                    </div>
-                  ))
+            const deleteBatch = (batchNum) => {
+              setConfirmState({
+                title: `Delete Batch ${batchNum}?`,
+                message: `This will permanently delete all ${batchMap[batchNum].length} reports in Batch ${batchNum}.`,
+                onConfirm: async () => {
+                  try {
+                    await api.delete(`/projects/${projectId}/custom-milestones/${ms.id}/reports/batch/${batchNum}`)
+                    onUpdate()
+                  } catch(e) { alert(e.response?.data?.detail || 'Failed to delete batch') }
                 }
-                <button onClick={()=>setShowTemplatePicker(false)} className="text-[10px] text-gray-400 mt-1.5 hover:text-gray-600">✕ Close</button>
-              </div>
-            )}
+              })
+            }
 
-            {ms.reports?.map(r => (
-              <ReportRow key={r.id} r={r} projectId={projectId} msId={ms.id} onUpdate={onUpdate} team={team} />
-            ))}
-            {addingReport ? (
-              <div className="p-2 bg-violet-50 rounded-xl border border-violet-100">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-0.5">Report Number</label>
-                    <input className="input text-xs h-7 w-full" placeholder="e.g. RPT-01" value={newReport.report_number}
-                      onChange={e=>setNewReport({...newReport,report_number:e.target.value})} autoFocus />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs text-gray-400 mb-0.5">Report Name</label>
-                    <input className="input text-xs h-7 w-full" placeholder="Report name" value={newReport.report_name}
-                      onChange={e=>setNewReport({...newReport,report_name:e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-0.5">Department</label>
-                    <input className="input text-xs h-7 w-full" placeholder="Department" value={newReport.department}
-                      onChange={e=>setNewReport({...newReport,department:e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-0.5">Status</label>
-                    <select className="select text-xs h-7 w-full" value={newReport.status}
-                      onChange={e=>setNewReport({...newReport,status:e.target.value})}>
-                      {STATUSES.map(st=><option key={st}>{st}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-0.5">Assigned To</label>
-                    {team?.length > 0 ? (
-                      <select className="select text-xs h-7 w-full" value={newReport.assigned_to}
-                        onChange={e=>setNewReport({...newReport,assigned_to:e.target.value})}>
-                        <option value="">— Unassigned —</option>
-                        {team.map(m=><option key={m.id} value={m.name}>{m.name}</option>)}
-                      </select>
-                    ) : (
-                      <input className="input text-xs h-7 w-full" placeholder="Name" value={newReport.assigned_to}
-                        onChange={e=>setNewReport({...newReport,assigned_to:e.target.value})} />
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-0.5">Due Date</label>
-                    <input type="date" className="input text-xs h-7 w-full" value={newReport.due_date}
-                      onChange={e=>setNewReport({...newReport,due_date:e.target.value})} />
+            return (
+              <div className="mb-4 pb-4 border-b border-gray-100">
+                <div className="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-wrap">
+                  <span>📄</span>
+                  Reports
+                  <span className="text-teal-600 font-normal text-[10px] bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">Data Analytics Mode</span>
+                  {ms.reports?.length > 0 && (
+                    <span className="ml-1 bg-violet-50 text-violet-600 text-[10px] px-1.5 py-0.5 rounded-md font-medium">
+                      {ms.reports.length} report{ms.reports.length !== 1 ? 's' : ''} · {batchNums.length} batch{batchNums.length !== 1 ? 'es' : ''}
+                    </span>
+                  )}
+                  <div className="ml-auto">
+                    <button
+                      onClick={() => setShowBatchPicker(true)}
+                      disabled={!projectReports?.length}
+                      className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1 hover:bg-violet-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!projectReports?.length ? 'Add reports to the project master list first (📊 Reports panel above)' : 'Assign a new batch of reports to this milestone'}
+                    >
+                      ➕ Add Batch
+                    </button>
                   </div>
                 </div>
-                {reportError && <div className="text-xs text-rose-600 mt-1.5">{reportError}</div>}
-                <div className="flex items-center gap-2 mt-2">
-                  <button onClick={saveMsReport} className="btn btn-primary text-xs py-1 px-2">✓ Add</button>
-                  <button onClick={()=>{setAddingReport(false);setReportError('')}} className="btn text-xs py-1 px-2">✕</button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={()=>setAddingReport(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium">➕ Add report</button>
-            )}
-          </div>}
 
-          {/* ── Tasks ──────────────────────────────────────────────────────── */}
-          {taskCount > 0 && (
+                {batchNums.length === 0 && (
+                  <p className="text-xs text-gray-400 italic py-2">
+                    No batches assigned yet. Click <strong>➕ Add Batch</strong> to assign reports from the project master list.
+                  </p>
+                )}
+
+                {batchNums.map(batchNum => (
+                  <div key={batchNum} className="mb-3 border border-violet-100 rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border-b border-violet-100">
+                      <span className="text-xs font-bold text-violet-700">Batch {batchNum}</span>
+                      <span className="text-[10px] text-violet-400">{batchMap[batchNum].length} report{batchMap[batchNum].length !== 1 ? 's' : ''}</span>
+                      <button
+                        onClick={() => deleteBatch(batchNum)}
+                        className="ml-auto text-[10px] text-rose-600 hover:text-rose-800 bg-white border border-rose-100 rounded px-2 py-0.5 hover:bg-rose-50"
+                      >🗑️ Delete Batch</button>
+                    </div>
+                    <div className="p-2 space-y-1.5">
+                      {batchMap[batchNum].map(r => (
+                        <ReportRow key={r.id} r={r} projectId={projectId} msId={ms.id} onUpdate={onUpdate} team={team} isDA={isDA} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Batch Picker Modal */}
+                {showBatchPicker && (
+                  <BatchPicker
+                    projectId={projectId}
+                    msId={ms.id}
+                    projectReports={projectReports}
+                    alreadyAssigned={alreadyAssignedPrIds}
+                    onClose={() => setShowBatchPicker(false)}
+                    onAdded={onUpdate}
+                  />
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Tasks — hidden for Data Analytics (reports-only) mode ─────── */}
+          {!isDA && taskCount > 0 && (
             <div className="text-xs text-gray-400 mb-2">👉 Click a task below to open its form fields and time management.</div>
           )}
-          {ms.tasks?.map(t => (
+          {!isDA && ms.tasks?.map(t => (
             <TaskBlock key={t.id} t={t} ms={ms} projectId={projectId} onUpdate={onUpdate} team={team}
               isOpen={activeTaskId === t.id}
               onSelect={() => setActiveTaskId(id => id === t.id ? null : t.id)} />
           ))}
-          {addTask ? (
+          {!isDA && addTask ? (
             <div className="flex items-center gap-2 p-3 bg-violet-50 rounded-xl border border-violet-100">
               <input className="input text-xs h-7 flex-1" placeholder="Task name..." value={newTask.name}
                 onChange={e=>setNewTask({...newTask,name:e.target.value})} onKeyDown={e=>e.key==='Enter'&&saveTask()} autoFocus />
@@ -987,13 +1210,13 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
               <button onClick={saveTask} disabled={saving} className="btn btn-primary text-xs py-1 px-2">{saving?'⟳':'✓ Add'}</button>
               <button onClick={()=>setAddTask(false)} className="btn text-xs py-1 px-2">✕</button>
             </div>
-          ) : (
+          ) : !isDA ? (
             <div className="flex items-center gap-3">
               <button onClick={()=>setAddTask(true)} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 font-medium">➕ Add task</button>
               <button onClick={openTplTasks} className="text-xs text-gray-400 hover:text-violet-600 flex items-center gap-1 font-medium">📋 From template</button>
             </div>
-          )}
-          {showTplTasks && (
+          ) : null}
+          {!isDA && showTplTasks && (
             <div className="mt-2">
               <FromTemplatePicker items={tplTasks||[]} labelKey="name" title="Add task from standard template"
                 onPick={pickTplTask} onClose={()=>setShowTplTasks(false)} />
@@ -1018,6 +1241,15 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen }) {
           team={team} onClose={() => setShowMailbox(false)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title || 'Are you sure?'}
+        message={confirmState?.message}
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }
@@ -1359,31 +1591,57 @@ export default function CustomMilestonesPage() {
   const [milestones, setMilestones] = useState([])
   const [templates, setTemplates] = useState([])
   const [team, setTeam] = useState([])
+  const [projectType, setProjectType] = useState(null)  // Req 7 — 'Data Analytics' triggers DA mode
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showMsPanel, setShowMsPanel] = useState(false)
   const [msg, setMsg] = useState(null)
+  // DA Report Master state
+  const [projectReports, setProjectReports] = useState([])
+  const [showReportMaster, setShowReportMaster] = useState(false)
+  const [newMasterReport, setNewMasterReport] = useState({ report_number: '', report_name: '', department: '' })
+  const [addingMaster, setAddingMaster] = useState(false)
+  const [masterErr, setMasterErr] = useState('')
+  const [editingMaster, setEditingMaster] = useState(null)   // { id, report_number, report_name, department }
   // Tab/icon view (testing feedback): each Milestone gets its own tab so the
   // form, details, and manual time entries for that one Milestone can be
   // worked on in a focused view, instead of scrolling a long stacked list.
   // 'all' keeps the original list view available too.
   const [activeTab, setActiveTab] = useState('all')
+  const [confirmState, setConfirmState] = useState(null)
 
   const load = async () => {
     setLoading(true)
     try {
-      const [mRes, tRes, teamRes] = await Promise.all([
+      const [mRes, tRes, teamRes, projRes] = await Promise.all([
         api.get(`/projects/${id}/custom-milestones?compact=true`),
         api.get(`/projects/${id}/custom-milestones/templates`),
         api.get(`/projects/${id}/team`).catch(() => ({ data: [] })),
+        api.get(`/projects/${id}`).catch(() => ({ data: {} })),   // Req 7 — get project_type
       ])
       setMilestones(mRes.data)
       setTemplates(tRes.data)
       setTeam(teamRes.data)
+      const pt = projRes.data?.project_type ?? null
+      setProjectType(pt)
+      // DA: load project-level report master catalogue
+      if (pt === 'Data Analytics') {
+        try {
+          const prRes = await api.get(`/projects/${id}/da-project-reports`)
+          setProjectReports(Array.isArray(prRes.data) ? prRes.data : [])
+        } catch { setProjectReports([]) }
+      }
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
+  }
+
+  const loadProjectReports = async () => {
+    try {
+      const r = await api.get(`/projects/${id}/da-project-reports`)
+      setProjectReports(Array.isArray(r.data) ? r.data : [])
+    } catch { setProjectReports([]) }
   }
 
   useEffect(() => { load() }, [id])
@@ -1417,12 +1675,18 @@ export default function CustomMilestonesPage() {
     bumpMilestonesVersion()
   }
 
-  const handleReset = async () => {
-    if (!window.confirm('Remove all milestones from this project? You can re-select them after.')) return
-    await api.delete(`/projects/${id}/custom-milestones/reset`)
-    showMsg('Milestones reset. Select new ones with ➕ Add milestones.', 'success')
-    await load()
-    bumpMilestonesVersion()
+  const handleReset = () => {
+    setConfirmState({
+      title: 'Reset all milestones?',
+      message: 'This will remove all milestones from this project. You can re-select them after.',
+      confirmLabel: 'Reset',
+      onConfirm: async () => {
+        await api.delete(`/projects/${id}/custom-milestones/reset`)
+        showMsg('Milestones reset. Select new ones with ➕ Add milestones.', 'success')
+        await load()
+        bumpMilestonesVersion()
+      }
+    })
   }
 
   const createCustom = async (data) => {
@@ -1434,12 +1698,32 @@ export default function CustomMilestonesPage() {
     } catch(e) { showMsg(e.response?.data?.detail||'Failed','error') }
   }
 
-  const deleteMilestone = async (msId) => {
-    if (!window.confirm('Remove this milestone from the project?')) return
-    await api.delete(`/projects/${id}/custom-milestones/${msId}`)
-    showMsg('Milestone removed')
-    await load()
-    bumpMilestonesVersion()
+  const deleteMilestone = (msId) => {
+    setConfirmState({
+      title: 'Remove milestone?',
+      message: 'This will remove the milestone and all its tasks from this project.',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        await api.delete(`/projects/${id}/custom-milestones/${msId}`)
+        showMsg('Milestone removed')
+        setMilestones(prev => prev.filter(m => m.id !== msId))
+        bumpMilestonesVersion()
+      }
+    })
+  }
+
+  const handleDeleteMasterReport = (r) => {
+    setConfirmState({
+      title: `Delete report "${r.report_number}"?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/projects/${id}/da-project-reports/${r.id}`)
+          loadProjectReports()
+        } catch(e) { alert(e.response?.data?.detail || 'Failed to delete') }
+      }
+    })
   }
 
   const availableCount = templates.filter(t=>!t.already_added).length
@@ -1461,6 +1745,16 @@ export default function CustomMilestonesPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* DA: Show "📊 Reports" button (master list toggle) instead of / in addition to Milestone jump */}
+          {projectType === 'Data Analytics' && (
+            <button
+              onClick={() => setShowReportMaster(v => !v)}
+              className={clsx('btn text-xs hover:border-teal-200 hover:text-teal-600', showReportMaster && 'border-teal-300 text-teal-700 bg-teal-50')}
+              title="Project-level Report Master List"
+            >
+              📊 Reports {projectReports.length > 0 && <span className="ml-1 text-[10px] bg-teal-100 text-teal-700 rounded px-1">{projectReports.length}</span>}
+            </button>
+          )}
           <div className="relative">
             <button onClick={() => setShowMsPanel(v => !v)} title="Jump to a milestone"
               className={clsx('btn text-xs hover:border-violet-200 hover:text-violet-600', showMsPanel && 'border-violet-300 text-violet-600 bg-violet-50')}>
@@ -1511,6 +1805,153 @@ export default function CustomMilestonesPage() {
         </div>
       )}
 
+      {/* ── DA Report Master Panel ──────────────────────────────────────── */}
+      {projectType === 'Data Analytics' && showReportMaster && (
+        <div className="mb-5 bg-white rounded-2xl border border-teal-100 shadow-sm overflow-hidden animate-fade-up">
+          <div className="flex items-center justify-between px-4 py-3 bg-teal-50 border-b border-teal-100">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📊</span>
+              <div>
+                <h2 className="text-sm font-bold text-teal-800">Project Report Master List</h2>
+                <p className="text-[10px] text-teal-600">Define all reports here. Then assign them to milestones in batches below.</p>
+              </div>
+            </div>
+            <button onClick={() => setShowReportMaster(false)} className="btn text-xs py-1 px-2 text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+
+          <div className="p-4">
+            {/* Table */}
+            {projectReports.length > 0 && (
+              <div className="mb-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left text-gray-400 font-medium py-1.5 pr-3 w-24">Report #</th>
+                      <th className="text-left text-gray-400 font-medium py-1.5 pr-3">Report Name</th>
+                      <th className="text-left text-gray-400 font-medium py-1.5 pr-3 w-32">Department</th>
+                      <th className="text-left text-gray-400 font-medium py-1.5 pr-3 w-20">Milestones</th>
+                      <th className="text-left text-gray-400 font-medium py-1.5 w-20">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectReports.map(r => (
+                      <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        {editingMaster?.id === r.id ? (
+                          // Inline edit row
+                          <>
+                            <td className="py-1.5 pr-3">
+                              <input className="input text-xs h-7 w-full" value={editingMaster.report_number}
+                                onChange={e=>setEditingMaster({...editingMaster,report_number:e.target.value})} />
+                            </td>
+                            <td className="py-1.5 pr-3">
+                              <input className="input text-xs h-7 w-full" value={editingMaster.report_name}
+                                onChange={e=>setEditingMaster({...editingMaster,report_name:e.target.value})} />
+                            </td>
+                            <td className="py-1.5 pr-3">
+                              <input className="input text-xs h-7 w-full" value={editingMaster.department}
+                                onChange={e=>setEditingMaster({...editingMaster,department:e.target.value})} />
+                            </td>
+                            <td className="py-1.5 pr-3 text-gray-400">{r.milestone_count}</td>
+                            <td className="py-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await api.patch(`/projects/${id}/da-project-reports/${r.id}`, {
+                                        report_number: editingMaster.report_number,
+                                        report_name: editingMaster.report_name,
+                                        department: editingMaster.department,
+                                      })
+                                      setEditingMaster(null)
+                                      loadProjectReports()
+                                    } catch(e) { alert(e.response?.data?.detail || 'Failed') }
+                                  }}
+                                  className="btn btn-primary text-[10px] py-0.5 px-1.5">✓</button>
+                                <button onClick={() => setEditingMaster(null)} className="btn text-[10px] py-0.5 px-1.5">✕</button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          // Read row
+                          <>
+                            <td className="py-1.5 pr-3 font-semibold text-teal-700">{r.report_number}</td>
+                            <td className="py-1.5 pr-3 text-gray-800">{r.report_name}</td>
+                            <td className="py-1.5 pr-3 text-gray-500">{r.department || '—'}</td>
+                            <td className="py-1.5 pr-3">
+                              {r.milestone_count > 0 ? (
+                                <span className="text-violet-600 font-medium">{r.milestone_count}</span>
+                              ) : <span className="text-gray-300">0</span>}
+                            </td>
+                            <td className="py-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setEditingMaster({ id: r.id, report_number: r.report_number, report_name: r.report_name, department: r.department || '' })}
+                                  className="btn text-[10px] py-0.5 px-1.5 hover:text-violet-600">✏️</button>
+                                <button
+                                  onClick={() => handleDeleteMasterReport(r)}
+                                  className="btn text-[10px] py-0.5 px-1.5 hover:text-rose-600">🗑️</button>
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Add new report form */}
+            {addingMaster ? (
+              <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Report Number *</label>
+                    <input className="input text-xs h-7 w-full" placeholder="e.g. RPT-01" autoFocus
+                      value={newMasterReport.report_number}
+                      onChange={e=>setNewMasterReport({...newMasterReport,report_number:e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Report Name *</label>
+                    <input className="input text-xs h-7 w-full" placeholder="Report name"
+                      value={newMasterReport.report_name}
+                      onChange={e=>setNewMasterReport({...newMasterReport,report_name:e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Department</label>
+                    <input className="input text-xs h-7 w-full" placeholder="e.g. Finance"
+                      value={newMasterReport.department}
+                      onChange={e=>setNewMasterReport({...newMasterReport,department:e.target.value})} />
+                  </div>
+                </div>
+                {masterErr && <div className="text-xs text-rose-600 mt-1.5">{masterErr}</div>}
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={async () => {
+                      if (!newMasterReport.report_number.trim() || !newMasterReport.report_name.trim()) {
+                        setMasterErr('Report Number and Name are required'); return
+                      }
+                      setMasterErr('')
+                      try {
+                        await api.post(`/projects/${id}/da-project-reports`, newMasterReport)
+                        setNewMasterReport({ report_number: '', report_name: '', department: '' })
+                        setAddingMaster(false)
+                        loadProjectReports()
+                      } catch(e) { setMasterErr(e.response?.data?.detail || 'Failed to add') }
+                    }}
+                    className="btn btn-primary text-xs py-1 px-2">✓ Add</button>
+                  <button onClick={() => { setAddingMaster(false); setMasterErr('') }} className="btn text-xs py-1 px-2">✕</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setAddingMaster(true)} className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1">
+                ➕ Add report to master list
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Milestone tab strip ─────────────────────────────────────────── */}
       {!loading && milestones.length > 0 && (
         <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
@@ -1550,14 +1991,16 @@ export default function CustomMilestonesPage() {
         <div>
           {milestones.map(ms => (
             <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={() => updateOneMilestone(ms.id)} team={team}
-              onDelete={() => deleteMilestone(ms.id)} forceOpen={false} />
+              onDelete={() => deleteMilestone(ms.id)} forceOpen={false}
+              isDA={projectType === 'Data Analytics'} projectReports={projectReports} />
           ))}
         </div>
       ) : (
         <div>
           {milestones.filter(ms => ms.id === activeTab).map(ms => (
             <MilestoneCard key={ms.id} ms={ms} projectId={id} onUpdate={() => updateOneMilestone(ms.id)} team={team}
-              onDelete={() => deleteMilestone(ms.id)} forceOpen />
+              onDelete={() => deleteMilestone(ms.id)} forceOpen
+              isDA={projectType === 'Data Analytics'} projectReports={projectReports} />
           ))}
         </div>
       )}
@@ -1580,6 +2023,15 @@ export default function CustomMilestonesPage() {
           onClose={() => setShowCreate(false)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title || 'Are you sure?'}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel || 'Confirm'}
+        danger={true}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

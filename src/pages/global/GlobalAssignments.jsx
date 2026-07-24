@@ -400,7 +400,7 @@ export default function GlobalAssignments() {
                       View →
                     </button>
                   ) : (
-                    <span className="text-gray-300 text-xs">—</span>
+                    <span className="text-xs text-gray-400 px-2">General</span>
                   )}
                 </div>
               </div>
