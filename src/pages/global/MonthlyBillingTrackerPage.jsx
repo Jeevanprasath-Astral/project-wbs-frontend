@@ -16,6 +16,7 @@ const today      = () => new Date().toISOString().slice(0, 10)
 
 export default function MonthlyBillingTrackerPage() {
   const navigate = useNavigate()
+  const [exporting, setExporting] = useState(false)
 
   const [projects, setProjects]   = useState([])
   const [filter, setFilter]       = useState({
@@ -42,6 +43,18 @@ export default function MonthlyBillingTrackerPage() {
   }, [filter])
 
   useEffect(() => { fetchReport() }, [fetchReport])
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      Object.entries(filter).forEach(([k, v]) => { if (v) params.append(k, v) })
+      const res = await api.get(`/billing-reports/monthly-tracker/export?${params}`, { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a'); a.href = url; a.download = 'monthly_billing_tracker.xlsx'
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+    } catch { /* silent */ } finally { setExporting(false) }
+  }
 
   const varColor = (v) => v > 0 ? 'text-emerald-600' : v < 0 ? 'text-rose-600' : 'text-gray-500'
 
@@ -97,6 +110,16 @@ export default function MonthlyBillingTrackerPage() {
               <input type="date" className="input text-xs h-8 w-36"
                 value={filter.end_date}
                 onChange={e => setFilter(f => ({ ...f, end_date: e.target.value }))} />
+            </div>
+            <div className="ml-auto">
+              <label className="block text-xs text-gray-500 mb-1 opacity-0">Export</label>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 transition-colors h-8"
+              >
+                {exporting ? '⏳ Exporting…' : '📥 Export Excel'}
+              </button>
             </div>
           </div>
         </div>

@@ -22,7 +22,9 @@ const ROLE_COLORS = {
 
 function MultiPersonSelect({ label, icon, roleFilter, allUsers, selected, onChange }) {
   const [open, setOpen] = useState(false)
-  const filtered = allUsers.filter(u => u.role === roleFilter)
+  const roleFilters = Array.isArray(roleFilter) ? roleFilter : [roleFilter]
+  const filtered = allUsers.filter(u => roleFilters.includes(u.role))
+  const chipColorKey = Array.isArray(roleFilter) ? roleFilter[0] : roleFilter
 
   const toggle = (u) => {
     const exists = selected.find(s => s.id === u.id)
@@ -45,7 +47,7 @@ function MultiPersonSelect({ label, icon, roleFilter, allUsers, selected, onChan
           {selected.map(u => (
             <div key={u.id}
               className={clsx('flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium',
-                ROLE_COLORS[roleFilter] || 'bg-gray-50 text-gray-600 border-gray-200')}>
+                ROLE_COLORS[chipColorKey] || 'bg-gray-50 text-gray-600 border-gray-200')}>
               <div className="w-4 h-4 rounded-full bg-violet-400 flex items-center justify-center text-white text-xs flex-shrink-0" style={{fontSize:'8px'}}>
                 {u.name?.slice(0,1).toUpperCase()}
               </div>
@@ -290,7 +292,7 @@ export default function ProjectSetup() {
             <MultiPersonSelect
               label="Functional Consultants"
               icon="🧩"
-              roleFilter="Functional Consultant"
+              roleFilter={["Functional Consultant", "FC Lead"]}
               allUsers={allUsers}
               selected={fcSelected}
               onChange={setFcSelected}
@@ -300,7 +302,7 @@ export default function ProjectSetup() {
             <MultiPersonSelect
               label="Technical Leads"
               icon="⚙️"
-              roleFilter="Technical Team"
+              roleFilter={["Technical Team", "TC Lead"]}
               allUsers={allUsers}
               selected={ttSelected}
               onChange={setTtSelected}

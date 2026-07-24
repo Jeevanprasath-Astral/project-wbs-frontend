@@ -284,10 +284,10 @@ export default function FinancialSettingsPage() {
                  style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>⚙️</div>
             <div>
               <h1 className="text-base font-bold text-gray-900">Financial Settings</h1>
-              <p className="text-xs text-gray-400">Admin & HR — manage project billing history and team member cost rates</p>
+              <p className="text-xs text-gray-400">Manage project billing history and team member cost rates</p>
             </div>
           </div>
-          <span className="ml-auto text-xs bg-violet-50 border border-violet-100 text-violet-600 font-medium px-2 py-0.5 rounded-full">🔒 Admin & HR</span>
+          <span className="ml-auto text-xs bg-violet-50 border border-violet-100 text-violet-600 font-medium px-2 py-0.5 rounded-full">🔒 Admin · HR · PM</span>
         </div>
       </div>
 
@@ -312,8 +312,8 @@ export default function FinancialSettingsPage() {
           <div className="flex justify-center items-center h-40 text-violet-400 text-sm animate-pulse">Loading…</div>
         ) : (
           <>
-            {/* ── Section 1: Project Billing History ───────────────────────── */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* ── Section 1: Project Billing History — hidden from HR ───────── */}
+            {user?.role !== 'HR' && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">💰</span>
@@ -743,7 +743,7 @@ export default function FinancialSettingsPage() {
                 {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
                 {projectSearch && ` matching "${projectSearch}"`}
               </div>
-            </div>
+            </div>}
 
             {/* ── Section 2: Team Member Cost Rates ────────────────────────── */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
