@@ -679,7 +679,6 @@ export default function AssignmentsPage() {
           </div>
         </div>
       )}
-    </div>
 
       <ConfirmModal
         open={!!confirmState}
@@ -690,5 +689,6 @@ export default function AssignmentsPage() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
   )
 }

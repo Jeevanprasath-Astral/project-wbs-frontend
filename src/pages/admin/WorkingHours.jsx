@@ -440,7 +440,6 @@ export default function WorkingHours() {
           </div>
         </div>
       )}
-    </div>
 
       <ConfirmModal
         open={!!confirmState}
@@ -451,5 +450,6 @@ export default function WorkingHours() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
   )
 }

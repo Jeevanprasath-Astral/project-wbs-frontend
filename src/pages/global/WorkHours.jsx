@@ -381,7 +381,6 @@ export default function WorkHours() {
       </div>
 
       {/* Log hours is now centralised in Timesheet Calendar → 🗓️ Log button */}
-    </div>
 
       <ConfirmModal
         open={!!confirmState}
@@ -392,5 +391,6 @@ export default function WorkHours() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
   )
 }

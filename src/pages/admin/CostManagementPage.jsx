@@ -331,7 +331,6 @@ export default function CostManagementPage() {
           </div>
         </div>
       )}
-    </div>
 
       <ConfirmModal
         open={!!confirmState}
@@ -342,5 +341,6 @@ export default function CostManagementPage() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
   )
 }

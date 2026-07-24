@@ -832,7 +832,6 @@ export default function FinancialSettingsPage() {
           </>
         )}
       </div>
-    </div>
 
       <ConfirmModal
         open={!!confirmState}
@@ -843,5 +842,6 @@ export default function FinancialSettingsPage() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
   )
 }
