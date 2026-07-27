@@ -195,6 +195,12 @@ export default function GlobalAssignments() {
     setAssignments(prev => prev.map(x => x.id === a.id ? {...x, status} : x))
   }
 
+  const handleDelete = async (a) => {
+    if (!window.confirm(`Delete "${a.title}"? This cannot be undone.`)) return
+    await api.delete(`/global/assignments/${a.id}`)
+    setAssignments(prev => prev.filter(x => x.id !== a.id))
+  }
+
   const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
 
   return (
@@ -393,7 +399,7 @@ export default function GlobalAssignments() {
                     {['Not Started','In Progress','Completed','On Hold'].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex items-center gap-1">
                   {a.project_id ? (
                     <button onClick={() => navigate(`/projects/${a.project_id}/assignments`)}
                       className="btn text-xs py-1 px-2 hover:text-violet-600 hover:border-violet-200 whitespace-nowrap">
@@ -401,6 +407,13 @@ export default function GlobalAssignments() {
                     </button>
                   ) : (
                     <span className="text-xs text-gray-400 px-2">General</span>
+                  )}
+                  {isElevated(user) && (
+                    <button onClick={() => handleDelete(a)}
+                      title="Delete assignment"
+                      className="ml-1 text-gray-300 hover:text-rose-500 transition-colors">
+                      🗑️
+                    </button>
                   )}
                 </div>
               </div>
