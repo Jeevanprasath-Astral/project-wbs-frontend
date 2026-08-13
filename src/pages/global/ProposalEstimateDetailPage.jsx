@@ -11,6 +11,69 @@ const FREQUENCIES       = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Ad-hoc', 
 const OUTPUT_METHODS    = ['Email', 'WhatsApp', 'Folder', 'Portal']
 const INPUT_FORMS       = ['Excel', 'PDF', 'API', 'Manual Entry']
 
+// ─── Feature questions config (static) ───────────────────────────────────────
+// Maps each feature toggle key → display label + structured scoping questions.
+const FEATURE_QUESTIONS = {
+  feat_viz: {
+    label: 'Visualization Layer',
+    questions: [
+      { id: 'viz_dashboards_required', text: 'Are dashboards required?' },
+      { id: 'viz_dashboard_count',     text: 'How many dashboards are required?' },
+      { id: 'viz_drill_down',          text: 'Is multi-level drill-down required? (Group → Division → Region → Entity)' },
+      { id: 'viz_chart_types',         text: 'What type of charts are required? (Trend lines, comparisons, heatmaps, funnel views, etc.)' },
+      { id: 'viz_date_ranges',         text: 'Are configurable date ranges and period-over-period comparisons required? (MoM, YoY, etc.)' },
+    ],
+  },
+  feat_alerts: {
+    label: 'Alerts & Exceptions',
+    questions: [
+      { id: 'alerts_threshold',         text: 'Threshold-based alerts required? (e.g., price deviation, KPI breach)' },
+      { id: 'alerts_anomaly',           text: 'Anomaly flagging required?' },
+      { id: 'alerts_exception_reports', text: 'Auto-generated exception reports required?' },
+    ],
+  },
+  feat_access: {
+    label: 'Access & Identity',
+    questions: [
+      { id: 'access_rbac',          text: 'Role-based access control (RBAC) — admin, manager, user, view-only tiers?' },
+      { id: 'access_org_hierarchy', text: 'Multi-level org hierarchy support (branch/region/division/entity)?' },
+      { id: 'access_sso',           text: 'SSO / Google-Microsoft login, or email+OTP?' },
+      { id: 'access_provisioning',  text: 'User provisioning/deprovisioning and password reset flows?' },
+    ],
+  },
+  feat_rules: {
+    label: 'Business Rule Configuration',
+    questions: [
+      { id: 'rules_formulas',    text: 'Admin-configurable formulas/weightages (e.g., KPI scoring)?' },
+      { id: 'rules_versioning',  text: "Rule versioning (historical calculations don't break on rule change)?" },
+      { id: 'rules_scenario',    text: 'Scenario/what-if testing before rule rollout?' },
+    ],
+  },
+  feat_mobile: {
+    label: 'Mobile App Support',
+    questions: [
+      { id: 'mobile_required', text: 'Is a mobile app required? (Yes / No)' },
+      { id: 'mobile_scope',    text: 'If yes — dashboard view only, or full app logic?' },
+    ],
+  },
+  feat_master: {
+    label: 'Master Data & Configuration',
+    questions: [
+      { id: 'master_configurable', text: 'Admin-configurable master data (departments, categories, products, locations)?' },
+      { id: 'master_dropdowns',    text: 'Configurable dropdowns/lookups instead of hardcoded values?' },
+      { id: 'master_bulk_import',  text: 'Bulk import/export (usually Excel-based)?' },
+    ],
+  },
+  feat_audit: {
+    label: 'Audit Trail & Compliance',
+    questions: [
+      { id: 'audit_logging',         text: 'Who-changed-what-when logging required?' },
+      { id: 'audit_version_history', text: 'Version history on key records?' },
+      { id: 'audit_data_retention',  text: 'Data retention/archival rules?' },
+    ],
+  },
+}
+
 // Phase 2+3: status actions use v2 endpoints that write audit logs + version increment
 const STATUS_FLOW = {
   Draft:     { next: 'Submit',  action: 'submit-v2',  label: 'Submit for Approval', btnClass: 'bg-amber-500 hover:bg-amber-600' },
@@ -62,11 +125,13 @@ function ChipGroup({ options, value = [], onChange, disabled }) {
   )
 }
 
-// ─── Feature toggle row ────────────────────────────────────────────────────────
-function FeatRow({ label, enabled, onToggle, detail, onDetail, placeholder, disabled }) {
+// ─── Feature block (toggle + structured Q&A questions) ────────────────────────
+function FeatureBlock({ featureKey, enabled, onToggle, answers = {}, onAnswer, disabled }) {
+  const config = FEATURE_QUESTIONS[featureKey]
+  if (!config) return null
   return (
     <div className={clsx('border border-gray-200 rounded-lg p-4 transition-colors', enabled ? 'bg-indigo-50/60' : 'bg-white')}>
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => !disabled && onToggle(!enabled)}
@@ -81,17 +146,24 @@ function FeatRow({ label, enabled, onToggle, detail, onDetail, placeholder, disa
             enabled ? 'translate-x-4' : 'translate-x-0'
           )} />
         </button>
-        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <span className="text-sm font-semibold text-gray-700">{config.label}</span>
       </div>
-      {enabled && (
-        <textarea
-          value={detail || ''}
-          onChange={e => !disabled && onDetail(e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          disabled={disabled}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-50"
-        />
+      {enabled && config.questions.length > 0 && (
+        <div className="mt-4 space-y-3 pl-12">
+          {config.questions.map(q => (
+            <div key={q.id}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{q.text}</label>
+              <textarea
+                value={answers[q.id] || ''}
+                onChange={e => !disabled && onAnswer(q.id, e.target.value)}
+                rows={2}
+                disabled={disabled}
+                placeholder={disabled ? '' : 'Enter your answer…'}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-50 disabled:text-gray-600"
+              />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -928,8 +1000,8 @@ export default function ProposalEstimateDetailPage() {
       {/* ── Tab: Estimation ───────────────────────────────────────────────────── */}
       {tab === 'estimation' && (
         <div className="space-y-5">
-          {/* Mode toggle */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
+          {/* Mode toggle + Convert button */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 flex-wrap">
             <span className="text-sm font-semibold text-gray-700">Estimation Mode:</span>
             {['hours', 'days'].map(m => (
               <button
@@ -948,7 +1020,19 @@ export default function ProposalEstimateDetailPage() {
               </button>
             ))}
             {estimation.mode === 'days' && (
-              <span className="text-xs text-gray-400 ml-2">1 day = 7 hours</span>
+              <span className="text-xs text-gray-400">1 day = 7 hours</span>
+            )}
+            {/* Convert button — switches display mode (data stays canonical in hours) */}
+            {editable && (
+              <button
+                onClick={() => setMode(estimation.mode === 'hours' ? 'days' : 'hours')}
+                className="ml-auto flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full hover:bg-indigo-100 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                {estimation.mode === 'hours' ? 'Convert to Man-Days' : 'Convert to Hours'}
+              </button>
             )}
           </div>
 
@@ -1057,58 +1141,23 @@ export default function ProposalEstimateDetailPage() {
       {tab === 'features' && featDraft && (
         <div className="space-y-4">
           <p className="text-xs text-gray-500 mb-4">
-            Enable the features required for this project. All fields are optional.
+            Enable the features required for this project and answer the scoping questions below each feature.
           </p>
           <div className="grid grid-cols-1 gap-3">
-            <FeatRow label="Data Visualization"
-              enabled={featDraft.feat_viz || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_viz: v }))}
-              detail={featDraft.feat_viz_types?.join(', ') || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_viz_types: v.split(',').map(x => x.trim()).filter(Boolean) }))}
-              placeholder="e.g. Bar chart, Pie chart, KPI cards, Line chart…"
-              disabled={!editable} />
-            <FeatRow label="Alerts & Notifications"
-              enabled={featDraft.feat_alerts || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_alerts: v }))}
-              detail={featDraft.feat_alerts_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_alerts_detail: v }))}
-              placeholder="Describe alert conditions and recipients…"
-              disabled={!editable} />
-            <FeatRow label="Role-Based Access Control"
-              enabled={featDraft.feat_access || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_access: v }))}
-              detail={featDraft.feat_access_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_access_detail: v }))}
-              placeholder="Describe user roles and their access levels…"
-              disabled={!editable} />
-            <FeatRow label="Business Rules / Conditional Logic"
-              enabled={featDraft.feat_rules || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_rules: v }))}
-              detail={featDraft.feat_rules_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_rules_detail: v }))}
-              placeholder="Describe the business rules or conditional flows…"
-              disabled={!editable} />
-            <FeatRow label="Mobile Access"
-              enabled={featDraft.feat_mobile || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_mobile: v }))}
-              detail={featDraft.feat_mobile_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_mobile_detail: v }))}
-              placeholder="Describe mobile access requirements…"
-              disabled={!editable} />
-            <FeatRow label="Master Data Management"
-              enabled={featDraft.feat_master || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_master: v }))}
-              detail={featDraft.feat_master_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_master_detail: v }))}
-              placeholder="Describe master data entities and management approach…"
-              disabled={!editable} />
-            <FeatRow label="Audit Trail / History Log"
-              enabled={featDraft.feat_audit || false}
-              onToggle={v => setFeatDraft(f => ({ ...f, feat_audit: v }))}
-              detail={featDraft.feat_audit_detail || ''}
-              onDetail={v => setFeatDraft(f => ({ ...f, feat_audit_detail: v }))}
-              placeholder="Describe what needs to be tracked in the audit log…"
-              disabled={!editable} />
+            {Object.keys(FEATURE_QUESTIONS).map(key => (
+              <FeatureBlock
+                key={key}
+                featureKey={key}
+                enabled={featDraft[key] || false}
+                onToggle={v => setFeatDraft(f => ({ ...f, [key]: v }))}
+                answers={featDraft.answers || {}}
+                onAnswer={(qid, val) => setFeatDraft(f => ({
+                  ...f,
+                  answers: { ...(f.answers || {}), [qid]: val },
+                }))}
+                disabled={!editable}
+              />
+            ))}
           </div>
           {editable && (
             <div className="flex justify-end pt-2">
