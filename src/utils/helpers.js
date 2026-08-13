@@ -58,7 +58,7 @@ export const MILESTONES = [
   { num: 10, name: 'Support' },
 ]
 
-export const ROLES = ['Admin', 'FC Lead', 'TC Lead', 'Functional Consultant', 'Technical Team', 'HR', 'Client']
+export const ROLES = ['Admin', 'Project Manager', 'FC Lead', 'TC Lead', 'Associate Data Analyst', 'Functional Consultant', 'Technical Team', 'HR', 'Client']
 export const STATUSES = ['Not Started', 'In Progress', 'Completed', 'On Hold']
 export const INPUT_TYPES = ['text', 'long', 'yesno', 'date', 'number', 'dropdown_hml', 'dropdown_freq', 'dropdown_pf']
 

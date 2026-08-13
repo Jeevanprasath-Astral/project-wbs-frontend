@@ -11,6 +11,7 @@ const GLOBAL_NAV = [
   { icon: '⏱️', label: 'Work Hours',       path: '/global/hours' },
   { icon: '🗓️', label: 'Timesheet Calendar', path: '/global/timesheet' },
   { icon: '🤝', label: 'Team Hub',           path: '/global/team' },
+  { icon: '📋', label: 'Proposal Estimates', path: '/global/proposal-estimates' },
 ]
 
 const REPORT_NAV = [
@@ -51,7 +52,7 @@ export default function GlobalLayout() {
         <nav className="flex-1 py-3 px-2 overflow-y-auto">
           <div className="text-xs text-slate-600 px-2 pt-1 pb-2 uppercase tracking-wider font-medium">Global Modules</div>
           {GLOBAL_NAV.map(n => {
-            const active = location.pathname === n.path
+            const active = location.pathname === n.path || location.pathname.startsWith(n.path + '/')
             return (
               <button key={n.path} onClick={() => navigate(n.path)}
                 className={clsx('w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-left transition-all duration-200 mb-0.5',

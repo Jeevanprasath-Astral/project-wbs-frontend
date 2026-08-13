@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fmtDate } from '../../utils/helpers'
+import { fmtDate, fmtDateTime } from '../../utils/helpers'
 import api from '../../utils/api'
 import { getProjectsList, getUsersList } from '../../utils/masterData'
 import { useAppStore } from '../../store'
-import { isElevated } from '../../utils/permissions'
+import { isElevated, isAdmin } from '../../utils/permissions'
 import clsx from 'clsx'
 
 const PRIORITY_CFG = {
@@ -23,6 +23,15 @@ const STATUS_CFG = {
 // — same rule used on the per-project Assignments page, so a task counts as
 // the same kind everywhere in the app.
 const isGeneralTask = (a) => !a.milestone_num && !a.custom_task_id
+
+// Small helper for the detail panel's key-value rows
+const Row = ({ icon, label, value, valueClass = 'text-gray-700' }) => (
+  <div className="flex items-start gap-2">
+    <span className="w-4 flex-shrink-0">{icon}</span>
+    <span className="font-medium text-gray-500 w-24 flex-shrink-0">{label}</span>
+    <span className={clsx('flex-1', valueClass)}>{value}</span>
+  </div>
+)
 
 export default function GlobalAssignments() {
   const navigate = useNavigate()
@@ -47,6 +56,13 @@ export default function GlobalAssignments() {
   const [showCatModal, setShowCatModal] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [savingCat, setSavingCat] = useState(false)
+
+  // Detail slide-in panel
+  const [detailTask, setDetailTask] = useState(null)
+  const [detailEdit, setDetailEdit] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [detailSaving, setDetailSaving] = useState(false)
+  const [detailDeleting, setDetailDeleting] = useState(false)
 
   const DEFAULT_CATEGORIES = ['Business Development', 'Research & Development', 'Learning & Development']
   const [formMilestones, setFormMilestones] = useState([])
@@ -201,6 +217,55 @@ export default function GlobalAssignments() {
     setAssignments(prev => prev.filter(x => x.id !== a.id))
   }
 
+  // Detail panel helpers
+  const openDetail = (a) => {
+    setDetailTask(a)
+    setDetailEdit(false)
+    setEditForm({
+      title: a.title || '',
+      description: a.description || '',
+      priority: a.priority || 'Medium',
+      status: a.status || 'Not Started',
+      due_date: a.due_date ? a.due_date.slice(0,10) : '',
+      team: a.team || '',
+      remarks: a.remarks || '',
+    })
+  }
+  const closeDetail = () => { setDetailTask(null); setDetailEdit(false) }
+
+  const canEditDetail = (a) => a && (isAdmin(user) || a.assigned_by === user?.id)
+
+  const handleDetailSave = async () => {
+    if (!detailTask) return
+    setDetailSaving(true)
+    try {
+      const r = await api.patch(`/global/assignments/${detailTask.id}`, {
+        ...editForm,
+        due_date: editForm.due_date || null,
+      })
+      setAssignments(prev => prev.map(x => x.id === detailTask.id ? r.data : x))
+      setDetailTask(r.data)
+      setDetailEdit(false)
+      showMsg('Task updated successfully ✅')
+    } catch(e) {
+      showMsg(e.response?.data?.detail || 'Update failed', 'error')
+    } finally { setDetailSaving(false) }
+  }
+
+  const handleDetailDelete = async () => {
+    if (!detailTask) return
+    if (!window.confirm(`Delete "${detailTask.title}"? This cannot be undone.`)) return
+    setDetailDeleting(true)
+    try {
+      await api.delete(`/global/assignments/${detailTask.id}`)
+      setAssignments(prev => prev.filter(x => x.id !== detailTask.id))
+      closeDetail()
+      showMsg('Task deleted and notification sent.')
+    } catch(e) {
+      showMsg(e.response?.data?.detail || 'Delete failed', 'error')
+    } finally { setDetailDeleting(false) }
+  }
+
   const setFilter = (k, v) => setFilters(f => ({...f, [k]: v}))
 
   return (
@@ -327,8 +392,8 @@ export default function GlobalAssignments() {
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="grid px-4 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-xs font-semibold text-white"
-               style={{gridTemplateColumns:'1.8fr 1.3fr 1fr 1.2fr 1fr 1fr 1fr 1.2fr 1fr'}}>
-            <div>Task</div><div>Project</div><div>Milestone</div><div>Assigned To</div>
+               style={{gridTemplateColumns:'1.5fr 1.1fr 0.7fr 1fr 1fr 0.8fr 0.9fr 0.8fr 1.1fr 0.9fr'}}>
+            <div>Task</div><div>Project</div><div>Milestone</div><div>Category</div><div>Assigned To</div>
             <div>Team</div><div>Priority</div><div>Due Date</div>
             <div>Status</div><div>Action</div>
           </div>
@@ -359,10 +424,11 @@ export default function GlobalAssignments() {
             const sc = STATUS_CFG[a.status] || STATUS_CFG['Not Started']
             return (
               <div key={a.id}
-                className={clsx('grid px-4 py-3 items-center border-b border-gray-50 last:border-0 hover:bg-violet-50/20 transition-colors text-xs',
+                onClick={() => openDetail(a)}
+                className={clsx('grid px-4 py-3 items-center border-b border-gray-50 last:border-0 hover:bg-violet-50/40 transition-colors text-xs cursor-pointer',
                   i%2===0?'bg-white':'bg-slate-50/30',
                   a.is_overdue && 'border-l-2 border-rose-300')}
-                style={{gridTemplateColumns:'1.8fr 1.3fr 1fr 1.2fr 1fr 1fr 1fr 1.2fr 1fr'}}>
+                style={{gridTemplateColumns:'1.5fr 1.1fr 0.7fr 1fr 1fr 0.8fr 0.9fr 0.8fr 1.1fr 0.9fr'}}>
                 <div className="min-w-0">
                   <div className="font-semibold text-gray-800 truncate" title={a.title}>{a.title}</div>
                   {a.description && <div className="text-gray-400 truncate mt-0.5" title={a.description}>{a.description}</div>}
@@ -374,6 +440,11 @@ export default function GlobalAssignments() {
                 </div>
                 <div className="font-medium text-violet-700 min-w-0 truncate">
                   {a.milestone_num ? `M${String(a.milestone_num).padStart(2,'0')}` : <span className="text-gray-300">—</span>}
+                </div>
+                <div className="min-w-0 truncate" title={a.category || ''}>
+                  {a.category
+                    ? <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs truncate">{a.category}</span>
+                    : <span className="text-gray-300">—</span>}
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium text-gray-700 truncate" title={a.assigned_to_name}>{a.assigned_to_name}</div>
@@ -393,13 +464,13 @@ export default function GlobalAssignments() {
                     </>
                   ) : <span className="text-gray-300">—</span>}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0" onClick={e => e.stopPropagation()}>
                   <select className="select text-xs h-7 w-full" value={a.status}
                     onChange={e => handleStatusChange(a, e.target.value)}>
                     {['Not Started','In Progress','Completed','On Hold'].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className="min-w-0 flex items-center gap-1">
+                <div className="min-w-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                   {a.project_id ? (
                     <button onClick={() => navigate(`/projects/${a.project_id}/assignments`)}
                       className="btn text-xs py-1 px-2 hover:text-violet-600 hover:border-violet-200 whitespace-nowrap">
@@ -408,7 +479,7 @@ export default function GlobalAssignments() {
                   ) : (
                     <span className="text-xs text-gray-400 px-2">General</span>
                   )}
-                  {isElevated(user) && (
+                  {canEditDetail(a) && (
                     <button onClick={() => handleDelete(a)}
                       title="Delete assignment"
                       className="ml-1 text-gray-300 hover:text-rose-500 transition-colors">
@@ -459,9 +530,165 @@ export default function GlobalAssignments() {
         </div>
       )}
 
+      {/* ── Detail Slide-in Panel ─────────────────────────────────────────── */}
+      {/* Backdrop */}
+      {detailTask && (
+        <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={closeDetail} />
+      )}
+      {/* Panel */}
+      <div className={clsx(
+        'fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300',
+        detailTask ? 'translate-x-0' : 'translate-x-full'
+      )}>
+        {detailTask && (() => {
+          const a = detailTask
+          const pc = PRIORITY_CFG[a.priority] || PRIORITY_CFG.Medium
+          const sc = STATUS_CFG[a.status] || STATUS_CFG['Not Started']
+          const canEdit = canEditDetail(a)
+          return (
+            <>
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-indigo-600">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📌</span>
+                  <span className="text-sm font-bold text-white">Task Details</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {canEdit && !detailEdit && (
+                    <button onClick={() => setDetailEdit(true)}
+                      className="text-xs px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg font-semibold transition-colors">
+                      ✏️ Edit
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={handleDetailDelete} disabled={detailDeleting}
+                      className="text-xs px-3 py-1.5 bg-rose-500/80 hover:bg-rose-500 text-white rounded-lg font-semibold transition-colors">
+                      {detailDeleting ? '⟳' : '🗑️'} Delete
+                    </button>
+                  )}
+                  <button onClick={closeDetail} className="text-white/70 hover:text-white text-xl ml-1">✕</button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {detailEdit ? (
+                  /* Edit mode */
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">📝 Title <span className="text-rose-500">*</span></label>
+                      <input className="input text-sm w-full" value={editForm.title}
+                        onChange={e => setEditForm(f => ({...f, title: e.target.value}))} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">📄 Description</label>
+                      <textarea className="textarea text-sm w-full" rows={3} value={editForm.description}
+                        onChange={e => setEditForm(f => ({...f, description: e.target.value}))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">🔴 Priority</label>
+                        <select className="select text-sm w-full" value={editForm.priority}
+                          onChange={e => setEditForm(f => ({...f, priority: e.target.value}))}>
+                          <option>High</option><option>Medium</option><option>Low</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">📊 Status</label>
+                        <select className="select text-sm w-full" value={editForm.status}
+                          onChange={e => setEditForm(f => ({...f, status: e.target.value}))}>
+                          {['Not Started','In Progress','Completed','On Hold'].map(s=><option key={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">👥 Team</label>
+                        <select className="select text-sm w-full" value={editForm.team}
+                          onChange={e => setEditForm(f => ({...f, team: e.target.value}))}>
+                          <option value="">— None —</option>
+                          <option>Functional Consultant</option>
+                          <option>Technical Team</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">📅 Due Date</label>
+                        <input type="date" className="input text-sm w-full" value={editForm.due_date}
+                          onChange={e => setEditForm(f => ({...f, due_date: e.target.value}))} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">💬 Remarks</label>
+                      <textarea className="textarea text-sm w-full" rows={2} value={editForm.remarks}
+                        onChange={e => setEditForm(f => ({...f, remarks: e.target.value}))} />
+                    </div>
+                  </div>
+                ) : (
+                  /* View mode */
+                  <div className="space-y-4">
+                    {/* Title + badges */}
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900 mb-1">{a.title}</h2>
+                      {a.description && <p className="text-sm text-gray-500 leading-relaxed">{a.description}</p>}
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className={clsx('px-2.5 py-0.5 rounded-full border text-xs font-medium', pc.cls)}>{pc.icon} {a.priority}</span>
+                        <span className={clsx('badge text-xs', sc.cls)}>{sc.icon} {a.status}</span>
+                        {a.is_overdue && <span className="text-xs text-rose-600 font-semibold">🔥 Overdue</span>}
+                      </div>
+                    </div>
+
+                    {/* Grid details */}
+                    <div className="bg-slate-50 rounded-xl p-4 space-y-2.5 text-xs">
+                      <Row icon="🏢" label="Project" value={a.project_name} />
+                      {a.project_client && a.project_client !== '—' && (
+                        <Row icon="🤝" label="Client" value={a.project_client} />
+                      )}
+                      <Row icon="👤" label="Assigned To" value={`${a.assigned_to_name} (${a.assigned_to_role})`} />
+                      <Row icon="🙋" label="Assigned By" value={a.assigned_by_name} />
+                      {a.team && <Row icon="👥" label="Team" value={a.team} />}
+                      {a.milestone_num && (
+                        <Row icon="🏁" label="Milestone" value={`M${String(a.milestone_num).padStart(2,'0')}`} />
+                      )}
+                      {a.task_name && <Row icon="✅" label="Task" value={a.task_name} />}
+                      {a.category && <Row icon="🏷️" label="Category" value={a.category} />}
+                      <Row icon="📅" label="Due Date" value={a.due_date ? fmtDate(a.due_date) : '—'} />
+                      {a.days_left !== null && a.due_date && (
+                        <Row icon="⏱️" label="Time Left"
+                          value={a.is_overdue ? `${Math.abs(a.days_left)}d overdue` : `${a.days_left}d remaining`}
+                          valueClass={a.is_overdue ? 'text-rose-600 font-semibold' : 'text-emerald-600 font-medium'} />
+                      )}
+                      <Row icon="🕐" label="Created" value={fmtDateTime(a.created_at)} />
+                      {a.completed_at && <Row icon="🎉" label="Completed" value={fmtDateTime(a.completed_at)} />}
+                    </div>
+
+                    {/* Remarks */}
+                    {a.remarks && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                        <div className="text-xs font-semibold text-amber-700 mb-1">💬 Remarks</div>
+                        <p className="text-xs text-amber-800 leading-relaxed">{a.remarks}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Panel footer */}
+              {detailEdit && (
+                <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
+                  <button onClick={() => setDetailEdit(false)} className="btn text-xs">Cancel</button>
+                  <button onClick={handleDetailSave} disabled={detailSaving}
+                    className="btn btn-primary text-xs">
+                    {detailSaving ? <><span className="animate-spin">⟳</span> Saving…</> : '💾 Save changes'}
+                  </button>
+                </div>
+              )}
+            </>
+          )
+        })()}
+      </div>
+
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div className="flex items-center gap-2"><span className="text-xl">📌</span><h2 className="text-sm font-semibold">Assign new task</h2></div>

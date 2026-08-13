@@ -15,7 +15,7 @@
 
 export const ALL_ROLES = [
   'Admin', 'Project Manager', 'FC Lead', 'TC Lead',
-  'Associate', 'HR', 'Client',
+  'Associate Data Analyst', 'Associate', 'HR', 'Client',
 ]
 
 // Keep legacy roles in a separate export for pages that may still reference them
@@ -25,7 +25,7 @@ export const LEGACY_ROLES = ['Functional Consultant', 'Technical Team']
 export const ALL_ASSIGNABLE_ROLES = [...ALL_ROLES, ...LEGACY_ROLES]
 
 const ELEVATED_ROLES        = new Set(['Admin', 'Project Manager', 'FC Lead', 'TC Lead'])
-const PROJECT_CREATOR_ROLES = new Set(['Admin', 'Project Manager'])
+const PROJECT_CREATOR_ROLES = new Set(['Admin', 'Project Manager', 'FC Lead'])
 const TEAM_MANAGER_ROLES    = new Set(['Admin', 'HR', 'Project Manager'])
 const TIMESHEET_MANAGER_ROLES = new Set(['Admin', 'HR'])
 const FINANCIAL_SETTINGS_ROLES = new Set(['Admin', 'HR'])
