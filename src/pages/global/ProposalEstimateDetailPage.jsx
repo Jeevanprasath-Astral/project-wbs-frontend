@@ -317,22 +317,35 @@ function ReportRow({ row, onUpdate, onDelete, disabled }) {
 
 
 // ─── Estimation row component (Phase 2) ───────────────────────────────────────
-function EstimationRowComp({ row, mode, onUpdate, onDelete, disabled }) {
+// quantity in form/display is always in the current mode's units (hrs or days).
+// quantity_hours on the row object is always canonical hours.
+function EstimationRowComp({ row, mode, onUpdate, onDelete, disabled, teamMembers = [] }) {
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({ ...row })
-  const [saving, setSaving] = useState(false)
+  const [saving,  setSaving]  = useState(false)
 
-  const preview = mode === 'days'
-    ? (form.quantity * 7 * form.cost_rate).toFixed(0)
-    : (form.quantity * form.cost_rate).toFixed(0)
+  // Always keep form in sync with row props (fixes stale-state after mode switch)
+  const [form, setForm] = useState({ ...row })
+  useEffect(() => {
+    if (!editing) setForm({ ...row })
+  }, [row, editing])
+
+  // Preview total cost: form.quantity is in display units (hrs or days).
+  // Convert to hours first, then multiply by rate (rate is always ₹/hr).
+  const formHours   = mode === 'days' ? (form.quantity || 0) * 7 : (form.quantity || 0)
+  const preview     = ((formHours) * (form.cost_rate || 0)).toFixed(0)
+
+  // Secondary label — show the "other" unit alongside the primary display value
+  const secondaryQty = mode === 'days'
+    ? `${(row.quantity_hours || 0).toFixed(1)} hrs`
+    : `${((row.quantity_hours || 0) / 7).toFixed(2)} days`
 
   const save = async () => {
     setSaving(true)
     try {
-      await onUpdate(row.id, form)
+      await onUpdate(row.id, { ...form })
       setEditing(false)
-    } catch (e) {
-      alert('Failed to save')
+    } catch {
+      // error already alerted by parent
     } finally {
       setSaving(false)
     }
@@ -349,20 +362,40 @@ function EstimationRowComp({ row, mode, onUpdate, onDelete, disabled }) {
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600">Role / Team</label>
-            <input value={form.role_description || ''} onChange={e => setForm(f => ({ ...f, role_description: e.target.value }))}
-              className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            <select
+              value={form.role_description || ''}
+              onChange={e => setForm(f => ({ ...f, role_description: e.target.value }))}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+              <option value="">— Select member / team —</option>
+              {/* Preserve existing value if not in current team list */}
+              {form.role_description && !teamMembers.find(m => m.name === form.role_description) && (
+                <option value={form.role_description}>{form.role_description}</option>
+              )}
+              {teamMembers.map(m => (
+                <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-xs font-semibold text-gray-600">{mode === 'days' ? 'Man-Days' : 'Hours'}</label>
-            <input type="number" min="0" step="0.5" value={form.quantity || 0}
+            <label className="text-xs font-semibold text-gray-600">
+              {mode === 'days' ? 'Man-Days' : 'Hours'}
+              <span className="text-gray-400 font-normal ml-1">(1 day = 7 hrs)</span>
+            </label>
+            <input type="number" min="0" step="0.5" value={form.quantity ?? 0}
               onChange={e => setForm(f => ({ ...f, quantity: +e.target.value }))}
               className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            {/* Show conversion hint */}
+            <p className="text-xs text-gray-400 mt-0.5">
+              = {mode === 'days'
+                  ? `${((form.quantity || 0) * 7).toFixed(1)} hrs`
+                  : `${((form.quantity || 0) / 7).toFixed(2)} days`}
+            </p>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600">Rate (₹/hr)</label>
-            <input type="number" min="0" value={form.cost_rate || 0}
+            <input type="number" min="0" value={form.cost_rate ?? 0}
               onChange={e => setForm(f => ({ ...f, cost_rate: +e.target.value }))}
               className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           </div>
@@ -371,6 +404,7 @@ function EstimationRowComp({ row, mode, onUpdate, onDelete, disabled }) {
             <div className="mt-1 px-2 py-1 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded border border-indigo-200">
               ₹{Number(preview).toLocaleString('en-IN')}
             </div>
+            <p className="text-xs text-gray-400 mt-0.5">{formHours.toFixed(1)} hrs × ₹{form.cost_rate || 0}/hr</p>
           </div>
         </div>
         <div className="flex justify-end gap-2">
@@ -389,8 +423,12 @@ function EstimationRowComp({ row, mode, onUpdate, onDelete, disabled }) {
       <div className="text-sm text-gray-500 font-medium">{row.sl_no}</div>
       <div className="text-sm text-gray-800 font-medium truncate pr-2">{row.description}</div>
       <div className="text-xs text-gray-500 truncate">{row.role_description || '—'}</div>
-      <div className="text-sm text-gray-700">{row.quantity} <span className="text-xs text-gray-400">{row.unit}</span></div>
-      <div className="text-sm text-gray-700">₹{(row.cost_rate || 0).toLocaleString('en-IN')}</div>
+      <div className="text-sm text-gray-700">
+        {(row.quantity || 0).toFixed(2)}{' '}
+        <span className="text-xs text-gray-400">{row.unit}</span>
+        <span className="text-xs text-gray-400 ml-1">({secondaryQty})</span>
+      </div>
+      <div className="text-sm text-gray-700">₹{(row.cost_rate || 0).toLocaleString('en-IN')}<span className="text-xs text-gray-400">/hr</span></div>
       <div className="text-sm font-semibold text-indigo-700">₹{(row.total_cost || 0).toLocaleString('en-IN')}</div>
       {!disabled && (
         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -452,6 +490,9 @@ export default function ProposalEstimateDetailPage() {
   const [auditLoaded,   setAuditLoaded]   = useState(false)
   const [exporting,     setExporting]     = useState(false)
 
+  // Team Hub members for Role/Team dropdown
+  const [teamMembers,   setTeamMembers]   = useState([])
+
   const canEdit    = user && CAN_EDIT_ROLES.has(user.role)
   const canApprove = user && CAN_APPROVE_ROLES.has(user.role)
   const isLocked   = proposal?.status === 'Approved' || proposal?.status === 'Archived'
@@ -460,12 +501,13 @@ export default function ProposalEstimateDetailPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [pRes, sRes, rRes, fRes, eRes] = await Promise.all([
+      const [pRes, sRes, rRes, fRes, eRes, tmRes] = await Promise.all([
         api.get(`/proposal-estimates/${id}`),
         api.get(`/proposal-estimates/${id}/sections`),
         api.get(`/proposal-estimates/${id}/reports`),
         api.get(`/proposal-estimates/${id}/features`),
         api.get(`/proposal-estimates/${id}/estimation`),
+        api.get('/proposal-estimates/team-members'),
       ])
       const p = pRes.data
       setProposal(p)
@@ -480,6 +522,7 @@ export default function ProposalEstimateDetailPage() {
       setFeatures(fData)
       setFeatDraft({ ...fData })
       setEstimation(eRes.data || { mode: 'hours', rows: [], total_qty: 0, total_hours: 0, total_cost: 0 })
+      setTeamMembers(tmRes.data || [])
       setAuditLoaded(false)
     } catch (e) {
       console.error(e)
@@ -1056,7 +1099,7 @@ export default function ProposalEstimateDetailPage() {
             {(estimation.rows || []).map(row => (
               <EstimationRowComp key={row.id} row={row} mode={estimation.mode}
                 onUpdate={handleUpdateEstRow} onDelete={handleDeleteEstRow}
-                disabled={!editable} />
+                disabled={!editable} teamMembers={teamMembers} />
             ))}
 
             {/* Add row inline form */}
@@ -1071,9 +1114,15 @@ export default function ProposalEstimateDetailPage() {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-gray-600">Role / Team</label>
-                    <input value={addEstRow.role_description || ''} onChange={e => setAddEstRow(f => ({ ...f, role_description: e.target.value }))}
-                      placeholder="e.g. Senior Developer"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    <select
+                      value={addEstRow.role_description || ''}
+                      onChange={e => setAddEstRow(f => ({ ...f, role_description: e.target.value }))}
+                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                      <option value="">— Select member / team —</option>
+                      {teamMembers.map(m => (
+                        <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1116,22 +1165,76 @@ export default function ProposalEstimateDetailPage() {
 
           {/* Summary card */}
           {(estimation.rows || []).length > 0 && (
-            <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-5 text-white">
-              <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">Estimation Summary</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-2xl font-bold">{estimation.total_qty?.toLocaleString('en-IN')}</p>
-                  <p className="text-xs text-slate-300 mt-0.5">{estimation.mode === 'days' ? 'Total Man-Days' : 'Total Hours'}</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{estimation.total_hours?.toLocaleString('en-IN')}</p>
-                  <p className="text-xs text-slate-300 mt-0.5">Effective Hours</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">₹{(estimation.total_cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</p>
-                  <p className="text-xs text-slate-300 mt-0.5">Total Cost</p>
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-5 text-white space-y-4">
+              {/* Overall totals */}
+              <div>
+                <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">Overall Estimation Summary</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {estimation.mode === 'days'
+                        ? (estimation.total_qty || 0).toFixed(2)
+                        : (estimation.total_hours || 0).toFixed(1)}
+                    </p>
+                    <p className="text-xs text-slate-300 mt-0.5">{estimation.mode === 'days' ? 'Total Man-Days' : 'Total Hours'}</p>
+                    {estimation.mode === 'days' && (
+                      <p className="text-xs text-slate-400 mt-0.5">= {(estimation.total_hours || 0).toFixed(1)} hrs</p>
+                    )}
+                    {estimation.mode === 'hours' && (
+                      <p className="text-xs text-slate-400 mt-0.5">= {((estimation.total_hours || 0) / 7).toFixed(2)} days</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">₹{(estimation.total_cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</p>
+                    <p className="text-xs text-slate-300 mt-0.5">Total Cost</p>
+                    <p className="text-xs text-slate-400 mt-0.5">@avg ₹{(estimation.total_hours || 0) > 0 ? ((estimation.total_cost || 0) / (estimation.total_hours || 1)).toFixed(0) : 0}/hr</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{(estimation.rows || []).length}</p>
+                    <p className="text-xs text-slate-300 mt-0.5">Work Items</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Role-wise breakdown */}
+              {(estimation.role_totals || []).length > 0 && (
+                <div className="border-t border-slate-600 pt-4">
+                  <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">Role-wise Summary</h3>
+                  <div className="space-y-2">
+                    {/* Header */}
+                    <div className="grid grid-cols-3 gap-2 text-xs text-slate-400 pb-1 border-b border-slate-600">
+                      <span>Role / Team</span>
+                      <span className="text-right">{estimation.mode === 'days' ? 'Man-Days' : 'Hours'}</span>
+                      <span className="text-right">Cost (₹)</span>
+                    </div>
+                    {(estimation.role_totals || []).map(rt => (
+                      <div key={rt.role} className="grid grid-cols-3 gap-2 items-baseline">
+                        <span className="text-sm text-slate-200 truncate">{rt.role}</span>
+                        <span className="text-sm text-right text-slate-100">
+                          {estimation.mode === 'days' ? rt.qty.toFixed(2) : rt.hours.toFixed(1)}
+                          <span className="text-xs text-slate-400 ml-1">{estimation.mode === 'days' ? 'days' : 'hrs'}</span>
+                        </span>
+                        <span className="text-sm font-semibold text-right text-white">
+                          ₹{rt.cost.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    ))}
+                    {/* Totals row */}
+                    <div className="grid grid-cols-3 gap-2 items-baseline border-t border-slate-500 pt-2 mt-1">
+                      <span className="text-xs font-semibold text-slate-300">Total</span>
+                      <span className="text-sm font-bold text-right text-white">
+                        {estimation.mode === 'days'
+                          ? (estimation.total_qty || 0).toFixed(2)
+                          : (estimation.total_hours || 0).toFixed(1)}
+                        <span className="text-xs text-slate-300 ml-1">{estimation.mode === 'days' ? 'days' : 'hrs'}</span>
+                      </span>
+                      <span className="text-sm font-bold text-right text-white">
+                        ₹{(estimation.total_cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
