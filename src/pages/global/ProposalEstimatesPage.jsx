@@ -42,6 +42,7 @@ export default function ProposalEstimatesPage() {
   const [loading,   setLoading]   = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [catFilter,    setCatFilter]    = useState('')
+  const [bdFilter,     setBdFilter]     = useState('')
 
   // create modal
   const [showCreate, setShowCreate] = useState(false)
@@ -55,8 +56,9 @@ export default function ProposalEstimatesPage() {
     setLoading(true)
     try {
       const params = {}
-      if (statusFilter) params.status   = statusFilter
-      if (catFilter)    params.category = catFilter
+      if (statusFilter) params.status    = statusFilter
+      if (catFilter)    params.category  = catFilter
+      if (bdFilter)     params.bd_status = bdFilter
       const { data } = await api.get('/proposal-estimates', { params })
       setProposals(data)
     } catch (e) {
@@ -64,7 +66,7 @@ export default function ProposalEstimatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, catFilter])
+  }, [statusFilter, catFilter, bdFilter])
 
   useEffect(() => { load() }, [load])
 
@@ -147,6 +149,25 @@ export default function ProposalEstimatesPage() {
         >
           <option value="">All Categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* BD Status select */}
+        <select
+          value={bdFilter}
+          onChange={e => setBdFilter(e.target.value)}
+          className="text-xs border border-gray-300 rounded-lg px-2.5 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        >
+          <option value="">🎯 All BD Stages</option>
+          <option value="Lead Qualification">Lead Qualification</option>
+          <option value="Warming Up">Warming Up</option>
+          <option value="Exploring">Exploring</option>
+          <option value="Showcased">Showcased</option>
+          <option value="Proposal">Proposal</option>
+          <optgroup label="Negotiating">
+            <option value="Negotiating - Won">Won</option>
+            <option value="Negotiating - Lost">Lost</option>
+          </optgroup>
+          <option value="Feature Follow-up">Feature Follow-up</option>
         </select>
       </div>
 

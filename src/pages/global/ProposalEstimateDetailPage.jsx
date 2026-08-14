@@ -91,6 +91,29 @@ const STATUS_STYLE = {
   Archived:  'bg-gray-100 text-gray-500',
 }
 
+// BD pipeline stage → badge color
+const BD_STAGE_STYLE = {
+  'Lead Qualification': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Warming Up':         'bg-cyan-100 text-cyan-700 border-cyan-200',
+  'Exploring':          'bg-teal-100 text-teal-700 border-teal-200',
+  'Showcased':          'bg-purple-100 text-purple-700 border-purple-200',
+  'Proposal':           'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Negotiating - Won':  'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Negotiating - Lost': 'bg-rose-100 text-rose-700 border-rose-200',
+  'Feature Follow-up':  'bg-amber-100 text-amber-700 border-amber-200',
+}
+
+const BD_STAGE_OPTIONS = [
+  { value: 'Lead Qualification', label: 'Lead Qualification', group: null },
+  { value: 'Warming Up',         label: 'Warming Up',         group: null },
+  { value: 'Exploring',          label: 'Exploring',          group: null },
+  { value: 'Showcased',          label: 'Showcased',          group: null },
+  { value: 'Proposal',           label: 'Proposal',           group: null },
+  { value: 'Negotiating - Won',  label: 'Won',                group: 'Negotiating' },
+  { value: 'Negotiating - Lost', label: 'Lost',               group: 'Negotiating' },
+  { value: 'Feature Follow-up',  label: 'Feature Follow-up',  group: null },
+]
+
 function fmtDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -547,6 +570,19 @@ export default function ProposalEstimateDetailPage() {
     }
   }
 
+  // ── BD Status auto-save ──────────────────────────────────────────────────────
+  const saveBdStatus = async (status, date) => {
+    try {
+      const { data } = await api.patch(`/proposal-estimates/${id}`, {
+        bd_status:      status || '',
+        bd_status_date: date || '',
+      })
+      setProposal(data)
+    } catch (e) {
+      console.error('Failed to save BD status', e)
+    }
+  }
+
   // ── Scope save ───────────────────────────────────────────────────────────────
   const saveScope = async () => {
     setScopeSaving(true)
@@ -843,6 +879,62 @@ export default function ProposalEstimateDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* BD Status row */}
+      <div className="px-6 py-2.5 border-t border-gray-100 bg-gradient-to-r from-slate-50 to-white flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold text-gray-500 flex-shrink-0">🎯 BD Status</span>
+        {/* Two-level dropdown using optgroup for Negotiating sub-options */}
+        <select
+          value={proposal.bd_status || ''}
+          onChange={e => saveBdStatus(e.target.value, proposal.bd_status_date || '')}
+          disabled={!editable}
+          className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-50 disabled:text-gray-500"
+          style={{ minWidth: 170 }}
+        >
+          <option value="">— No stage —</option>
+          <option value="Lead Qualification">Lead Qualification</option>
+          <option value="Warming Up">Warming Up</option>
+          <option value="Exploring">Exploring</option>
+          <option value="Showcased">Showcased</option>
+          <option value="Proposal">Proposal</option>
+          <optgroup label="Negotiating">
+            <option value="Negotiating - Won">Won</option>
+            <option value="Negotiating - Lost">Lost</option>
+          </optgroup>
+          <option value="Feature Follow-up">Feature Follow-up</option>
+        </select>
+
+        {/* Stage badge */}
+        {proposal.bd_status && (
+          <span className={clsx(
+            'px-2.5 py-0.5 rounded-full text-xs font-semibold border',
+            BD_STAGE_STYLE[proposal.bd_status] || 'bg-gray-100 text-gray-600 border-gray-200'
+          )}>
+            {proposal.bd_status}
+          </span>
+        )}
+
+        {/* Date field — shown only when a stage is selected */}
+        {proposal.bd_status && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-400">📅 Stage Date</span>
+            <input
+              type="date"
+              value={proposal.bd_status_date || ''}
+              onChange={e => saveBdStatus(proposal.bd_status, e.target.value)}
+              disabled={!editable}
+              className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            {!editable && proposal.bd_status_date && (
+              <span className="text-xs text-gray-600">{fmtDate(proposal.bd_status_date)}</span>
+            )}
+          </div>
+        )}
+
+        {!proposal.bd_status && !editable && (
+          <span className="text-xs text-gray-400 italic">No BD stage set</span>
+        )}
       </div>
 
       {/* Tabs */}

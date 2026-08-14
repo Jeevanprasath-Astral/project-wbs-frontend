@@ -49,7 +49,7 @@ export default function GlobalAssignments() {
   // page split, so the two categories never appear interleaved here either.
   const [activeTab, setActiveTab] = useState('general')
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ project_id:'', title:'', description:'', assigned_to:'', milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', team:'', remarks:'', status:'Not Started', category:'' })
+  const [form, setForm] = useState({ project_id:'', title:'', description:'', assigned_to:[], milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', team:'', remarks:'', status:'Not Started', category:'' })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
   const [categories, setCategories] = useState([])
@@ -176,25 +176,32 @@ export default function GlobalAssignments() {
     // no visible reaction whatsoever. The button is no longer disabled for
     // this case (see below) — instead we show a real, visible error.
     if (!form.title) { showMsg('Please enter a task title.', 'error'); return }
-    if (!form.assigned_to) { showMsg('Please select who to assign this task to.', 'error'); return }
+    if (!form.assigned_to || form.assigned_to.length === 0) { showMsg('Please select who to assign this task to.', 'error'); return }
     setSaving(true)
     try {
-      const payload = {
+      const basePayload = {
         ...form,
-        assigned_to: parseInt(form.assigned_to),
         milestone_num: form.project_id && form.milestone_num ? parseInt(form.milestone_num) : null,
         custom_task_id: form.project_id && form.milestone_num && form.custom_task_id ? parseInt(form.custom_task_id) : null,
         due_date: form.due_date || null,
       }
-      if (form.project_id) {
-        await api.post(`/projects/${form.project_id}/assignments`, payload)
-      } else {
-        // General Task — assigned to a person without linking to a project
-        await api.post('/global/assignments', { ...payload, project_id: null })
+      for (const uid of form.assigned_to) {
+        const payload = { ...basePayload, assigned_to: parseInt(uid) }
+        if (form.project_id) {
+          await api.post(`/projects/${form.project_id}/assignments`, payload)
+        } else {
+          // General Task — assigned to a person without linking to a project
+          await api.post('/global/assignments', { ...payload, project_id: null })
+        }
       }
-      showMsg(form.project_id ? 'Task assigned successfully! 🎉' : 'General task assigned successfully! 🎉')
+      const count = form.assigned_to.length
+      showMsg(
+        form.project_id
+          ? `Task assigned to ${count} member${count > 1 ? 's' : ''}! 🎉`
+          : `General task assigned to ${count} member${count > 1 ? 's' : ''}! 🎉`
+      )
       setShowModal(false)
-      setForm({ project_id:'', title:'', description:'', assigned_to:'', milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', team:'', remarks:'', status:'Not Started', category:'' })
+      setForm({ project_id:'', title:'', description:'', assigned_to:[], milestone_num:'', custom_task_id:'', priority:'Medium', due_date:'', team:'', remarks:'', status:'Not Started', category:'' })
       load()
     } catch(e) {
       const detail = e.response?.data?.detail
@@ -729,12 +736,47 @@ export default function GlobalAssignments() {
                   value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">👤 Assign to <span className="text-rose-500">*</span></label>
-                  <select className="select text-sm" value={form.assigned_to} onChange={e => setForm({...form, assigned_to: e.target.value})}>
-                    <option value="">— Select person —</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                  </select>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    👤 Assign to <span className="text-rose-500">*</span>
+                    {form.assigned_to.length > 0 && (
+                      <span className="ml-2 text-indigo-600 font-semibold">{form.assigned_to.length} selected</span>
+                    )}
+                  </label>
+                  <div className="border border-gray-300 rounded-lg overflow-y-auto" style={{ maxHeight: 150 }}>
+                    {users.length === 0 && (
+                      <p className="text-xs text-gray-400 px-3 py-2">No users available</p>
+                    )}
+                    {users.map(u => {
+                      const uid = String(u.id)
+                      const checked = form.assigned_to.includes(uid)
+                      return (
+                        <label
+                          key={u.id}
+                          className={clsx(
+                            'flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors',
+                            checked ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              setForm(f => ({
+                                ...f,
+                                assigned_to: e.target.checked
+                                  ? [...f.assigned_to, uid]
+                                  : f.assigned_to.filter(x => x !== uid)
+                              }))
+                            }}
+                            className="accent-indigo-600 w-3.5 h-3.5 flex-shrink-0"
+                          />
+                          <span className="text-sm text-gray-800 font-medium">{u.name}</span>
+                          <span className="text-xs text-gray-400">({u.role})</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">👥 Team</label>
