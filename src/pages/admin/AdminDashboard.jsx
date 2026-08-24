@@ -4,6 +4,7 @@ import { fmtDate, fmtDateTime, daysLeft, fmtHours } from '../../utils/helpers'
 import { DashboardSkeleton } from '../../components/common/SkeletonLoader'
 import api from '../../utils/api'
 import clsx from 'clsx'
+import { withPageCache } from '../../utils/pageDataStore'
 
 const MS_ICONS = ['🚀','🤝','🔍','📝','⚙️','🧪','📦','✅','🌟','🛡️']
 
@@ -46,25 +47,27 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    setLoading(true)
     setError(null)
-    Promise.all([
-      api.get(`/projects/${id}/dashboard`),
-      api.get(`/projects/${id}/assignments/summary`).catch(() => ({ data: null })),
-      api.get(`/work-hours/summary?project_id=${id}`).catch(() => ({ data: null })),
-    ])
-      .then(([dashRes, assignRes, whRes]) => {
-        setData({ ...dashRes.data, assignmentSummary: assignRes.data })
-        setWhSummary(whRes.data)
-      })
-      .catch(err => {
-        console.error('Dashboard error:', err)
-        setError(err.response?.data?.detail || 'Failed to load dashboard')
-      })
-      .finally(() => setLoading(false))
+    withPageCache(
+      `page:${id}:dashboard`,
+      async () => {
+        const [dashRes, assignRes, whRes] = await Promise.all([
+          api.get(`/projects/${id}/dashboard`),
+          api.get(`/projects/${id}/assignments/summary`).catch(() => ({ data: null })),
+          api.get(`/work-hours/summary?project_id=${id}`).catch(() => ({ data: null })),
+        ])
+        return { data: { ...dashRes.data, assignmentSummary: assignRes.data }, whSummary: whRes.data }
+      },
+      ({ data, whSummary }) => { setData(data); setWhSummary(whSummary) },
+      setLoading,
+    ).catch(err => {
+      console.error('Dashboard error:', err)
+      setError(err.response?.data?.detail || 'Failed to load dashboard')
+      setLoading(false)
+    })
   }, [id])
 
-  if (loading) return <DashboardSkeleton />
+  if (loading && !data) return <DashboardSkeleton />
   if (error) return (
     <div className="flex items-center justify-center h-64">
       <div className="text-center animate-fade-up">

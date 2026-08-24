@@ -1,3 +1,41 @@
+// Generic skeleton for pages that don't have a bespoke one — shows a
+// realistic card-list layout that matches most project pages (Assignments,
+// WorkingHours, Notifications, Team, Cost Management).
+export function GenericPageSkeleton({ rows = 5 }) {
+  return (
+    <div className="space-y-4 animate-pulse">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="h-5 w-40 bg-gray-200 rounded-xl mb-2" />
+          <div className="h-3 w-56 bg-gray-100 rounded-xl" />
+        </div>
+        <div className="h-8 w-28 bg-gray-200 rounded-xl" />
+      </div>
+      {/* Filter bar */}
+      <div className="flex gap-2">
+        <div className="h-8 w-32 bg-gray-100 rounded-xl" />
+        <div className="h-8 w-32 bg-gray-100 rounded-xl" />
+        <div className="h-8 w-24 bg-gray-100 rounded-xl" />
+      </div>
+      {/* Card rows */}
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+          <div className="w-9 h-9 bg-gray-100 rounded-xl flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-200 rounded-xl" style={{ maxWidth: `${220 + i * 25}px` }} />
+            <div className="h-3 bg-gray-100 rounded-xl" style={{ maxWidth: `${140 + i * 15}px` }} />
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <div className="h-6 w-20 bg-gray-100 rounded-xl" />
+            <div className="h-6 w-16 bg-gray-100 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function MilestoneSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">

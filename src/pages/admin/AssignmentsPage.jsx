@@ -3,11 +3,13 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import { useParams } from 'react-router-dom'
 import { fmtDate, fmtDateTime, fmtHours } from '../../utils/helpers'
 import api from '../../utils/api'
-import { getProjectTeam, getProjectCustomMilestones } from '../../utils/masterData'
+import { getProjectTeam, getProjectCustomMilestones, getAssignmentCategories } from '../../utils/masterData'
 import { useAppStore } from '../../store'
 import { isElevated } from '../../utils/permissions'
 import clsx from 'clsx'
 import { dateRangeError } from '../../utils/dateRange'
+import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
+import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
 
 const PRIORITY_CONFIG = {
   'High':   { cls: 'bg-rose-50 text-rose-700 border-rose-100',   icon: '🔴' },
@@ -202,26 +204,34 @@ export default function AssignmentsPage() {
 
   const loadCategories = async () => {
     try {
-      const r = await api.get('/global/assignment-categories')
-      setCategories(r.data)
+      const data = await getAssignmentCategories() // Fix G: now cached in masterData
+      setCategories(data)
     } catch(e) { console.error(e) }
   }
 
   const load = async () => {
-    try {
-      const [aRes, teamData, msData] = await Promise.all([
-        api.get(`/projects/${id}/assignments`),
-        getProjectTeam(id),
-        getProjectCustomMilestones(id).catch(() => []),
-      ])
-      setAssignments(aRes.data)
-      setTeam(teamData)
-      setCustomMilestones(msData)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    await withPageCache(
+      `page:${id}:assignments`,
+      async () => {
+        const [aRes, teamData, msData, cats] = await Promise.all([
+          api.get(`/projects/${id}/assignments`),
+          getProjectTeam(id),
+          getProjectCustomMilestones(id).catch(() => []),
+          getAssignmentCategories().catch(() => []),
+        ])
+        return { assignments: aRes.data, team: teamData, milestones: msData, categories: cats }
+      },
+      ({ assignments, team, milestones, categories }) => {
+        setAssignments(assignments)
+        setTeam(team)
+        setCustomMilestones(milestones)
+        setCategories(categories)
+      },
+      setLoading,
+    )
   }
 
-  useEffect(() => { load(); loadCategories() }, [id])
+  useEffect(() => { load() }, [id])
 
   const showMsg = (text, type = 'success') => {
     setMessage({ text, type })
@@ -245,6 +255,9 @@ export default function AssignmentsPage() {
       await api.post('/global/assignment-categories', { name })
       setNewCatName('')
       setShowCatModal(false)
+      // Invalidate cached categories so next load gets fresh list
+      const { cache } = await import('../../utils/cache')
+      cache.invalidate('master:assignment-categories')
       await loadCategories()
       setForm(f => ({...f, category: name}))
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to create category', 'error') }
@@ -289,6 +302,7 @@ export default function AssignmentsPage() {
       showMsg('Task assigned successfully! 🎉')
       setShowModal(false)
       resetForm()
+      invalidatePage(`page:${id}:assignments`)
       load()
     } catch (e) {
       // FastAPI validation errors (422) return `detail` as an ARRAY of
@@ -318,6 +332,7 @@ export default function AssignmentsPage() {
       await api.delete(`/projects/${id}/assignments/${aid}`)
       setAssignments(prev => prev.filter(a => a.id !== aid))
       showMsg('Assignment deleted')
+      invalidatePage(`page:${id}:assignments`)
       load()
     } catch (e) { showMsg('Failed to delete', 'error') } } })
   }
@@ -348,14 +363,7 @@ export default function AssignmentsPage() {
     overdue:     tabAssignments.filter(a => a.due_date && new Date(a.due_date) < new Date() && a.status !== 'Completed').length,
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64 text-violet-400">
-      <div className="text-center animate-pulse">
-        <div className="text-4xl mb-3 animate-float">📌</div>
-        <div className="text-sm font-medium">Loading assignments...</div>
-      </div>
-    </div>
-  )
+  if (loading && assignments.length === 0) return <GenericPageSkeleton rows={5} />
 
   return (
     <div className="animate-fade-up">

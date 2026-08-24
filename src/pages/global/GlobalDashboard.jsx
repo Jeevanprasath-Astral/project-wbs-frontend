@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
-import { getProjectsList, getUsersList } from '../../utils/masterData'
 import { fmtHours } from '../../utils/helpers'
 import clsx from 'clsx'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, PieChart, Pie, Cell } from 'recharts'
@@ -24,14 +23,12 @@ export default function GlobalDashboard() {
   const load = async () => {
     setLoading(true)
     try {
-      // Shared params for endpoints whose query-param names already match
-      // the filters state 1:1 (workload, project-status).
+      // Fix 8: /global/dashboard-summary merges workload + project-status +
+      // projects-list + users-list into one round-trip (was 4 separate calls).
       const wParams = new URLSearchParams()
       Object.entries(filters).forEach(([k,v]) => v && wParams.append(k, v))
 
-      // /global/assignments uses `assigned_to` instead of `employee_id` —
-      // without this mapping the employee filter is silently dropped and
-      // the summary cards/pie chart/By-Project breakdown ignore it.
+      // /global/assignments uses `assigned_to` instead of `employee_id`.
       const aParams = new URLSearchParams()
       if (filters.project_id) aParams.append('project_id', filters.project_id)
       if (filters.team) aParams.append('team', filters.team)
@@ -47,20 +44,18 @@ export default function GlobalDashboard() {
       if (filters.date_from) whParams.append('date_from', filters.date_from)
       if (filters.date_to) whParams.append('date_to', filters.date_to)
 
-      const [aRes, wRes, projectsData, usersData, whRes, psRes] = await Promise.all([
+      // 3 calls instead of 6: assignments + summary bundle + work-hours
+      const [aRes, summaryRes, whRes] = await Promise.all([
         api.get(`/global/assignments?${aParams}`),
-        api.get(`/global/workload?${wParams}`),
-        getProjectsList(),
-        getUsersList(),
+        api.get(`/global/dashboard-summary?${wParams}`),
         api.get(`/work-hours/summary?${whParams}`).catch(() => ({ data: null })),
-        api.get(`/global/project-status?${wParams}`).catch(() => ({ data: [] })),
       ])
       setAssignments(aRes.data)
-      setWorkload(wRes.data)
-      setProjects(projectsData)
-      setUsers(usersData)
+      setWorkload(summaryRes.data.workload)
+      setProjects(summaryRes.data.projects || [])
+      setUsers(summaryRes.data.users || [])
       setWhSummary(whRes.data)
-      setProjectStatus(psRes.data || [])
+      setProjectStatus(summaryRes.data.project_status || [])
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
   }

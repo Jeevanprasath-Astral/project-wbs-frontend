@@ -6,6 +6,8 @@ import { getUsersList, getProjectCustomMilestones } from '../../utils/masterData
 import { fmtHours } from '../../utils/helpers'
 import clsx from 'clsx'
 import { useAppStore } from '../../store'
+import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
+import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
 
 const today = () => new Date().toISOString().split('T')[0]
 const daysAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0] }
@@ -47,25 +49,37 @@ export default function WorkingHours() {
 
   const load = async () => {
     const mySeq = ++loadSeq.current
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ project_id: projectId })
-      Object.entries(filters).forEach(([k,v]) => v && params.append(k, v))
-      const [rRes, sRes, usersData, aRes, msData] = await Promise.all([
-        api.get(`/work-hours?${params}`),
-        api.get(`/work-hours/summary?${params}`),
-        getUsersList(),
-        api.get(`/projects/${projectId}/assignments`),
-        getProjectCustomMilestones(projectId),
-      ])
-      if (mySeq !== loadSeq.current) return // a newer filter change superseded this request
-      setRecords(rRes.data)
-      setSummary(sRes.data)
-      setUsers(usersData)
-      setAssignments(aRes.data.filter(a => a.status !== 'Completed'))
-      setCmMilestones(msData)
-    } catch(e) { console.error(e) }
-    finally { if (mySeq === loadSeq.current) setLoading(false) }
+    const filterKey = `${filters.user_id}|${filters.date_from}|${filters.date_to}`
+    const cacheKey = `page:${projectId}:working-hours:${filterKey}`
+    const apply = (data) => {
+      if (mySeq !== loadSeq.current) return // a newer filter change superseded this
+      setRecords(data.records)
+      setSummary(data.summary)
+      setUsers(data.users)
+      setAssignments(data.assignments)
+      setCmMilestones(data.milestones)
+    }
+    await withPageCache(
+      cacheKey,
+      async () => {
+        const params = new URLSearchParams({ project_id: projectId })
+        Object.entries(filters).forEach(([k,v]) => v && params.append(k, v))
+        const [rRes, sRes, usersData, aRes, msData] = await Promise.all([
+          api.get(`/work-hours?${params}`),
+          api.get(`/work-hours/summary?${params}`),
+          getUsersList(),
+          api.get(`/projects/${projectId}/assignments`),
+          getProjectCustomMilestones(projectId),
+        ])
+        return {
+          records: rRes.data, summary: sRes.data, users: usersData,
+          assignments: aRes.data.filter(a => a.status !== 'Completed'),
+          milestones: msData,
+        }
+      },
+      apply,
+      setLoading,
+    )
   }
 
   const _loadTimer = useRef(null)
@@ -139,6 +153,7 @@ export default function WorkingHours() {
       showMsg('Working hours logged! It now reflects in Milestone Configuration, Team Workload & Deadlines.')
       setShowLog(false)
       resetForm()
+      invalidatePage(`page:${projectId}:working-hours:${filters.user_id}|${filters.date_from}|${filters.date_to}`)
       load()
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to log hours', 'error') }
     finally { setSaving(false) }
@@ -150,19 +165,13 @@ export default function WorkingHours() {
       message: 'This cannot be undone.',
       onConfirm: async () => {
         await api.delete(`/work-hours/${rid}`)
+        invalidatePage(`page:${projectId}:working-hours:${filters.user_id}|${filters.date_from}|${filters.date_to}`)
         load()
       }
     })
   }
 
-  if (loading && !records.length) return (
-    <div className="flex items-center justify-center h-64 text-emerald-400">
-      <div className="text-center animate-pulse">
-        <div className="text-4xl mb-3">⏱️</div>
-        <div className="text-sm font-medium">Loading working hours...</div>
-      </div>
-    </div>
-  )
+  if (loading && !records.length) return <GenericPageSkeleton rows={6} />
 
   return (
     <div className="animate-fade-up">

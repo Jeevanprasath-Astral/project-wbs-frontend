@@ -5,6 +5,8 @@ import clsx from 'clsx'
 import { useAppStore } from '../../store'
 import { ALL_ROLES, isTeamManager } from '../../utils/permissions'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
+import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
 
 const ROLES = ALL_ROLES
 
@@ -47,18 +49,18 @@ export default function TeamPage() {
   const [confirmState, setConfirmState] = useState(null)
 
   const load = async () => {
-    try {
-      const [teamRes, usersRes] = await Promise.all([
-        api.get(`/projects/${id}/team`),
-        api.get(`/projects/${id}/all-users`),
-      ])
-      setTeam(teamRes.data)
-      setAllUsers(usersRes.data)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+    await withPageCache(
+      `page:${id}:team`,
+      async () => {
+        const [teamRes, usersRes] = await Promise.all([
+          api.get(`/projects/${id}/team`),
+          api.get(`/projects/${id}/all-users`),
+        ])
+        return { team: teamRes.data, allUsers: usersRes.data }
+      },
+      ({ team, allUsers }) => { setTeam(team); setAllUsers(allUsers) },
+      setLoading,
+    )
   }
 
   useEffect(() => { load() }, [id])
@@ -76,6 +78,7 @@ export default function TeamPage() {
       showMsg(res.data.message)
       setShowAddModal(false)
       setSelectedUserId('')
+      invalidatePage(`page:${id}:team`)
       load()
     } catch (e) {
       showMsg(e.response?.data?.detail || 'Failed to add member', 'error')
@@ -92,6 +95,7 @@ export default function TeamPage() {
       showMsg(res.data.message)
       setShowAddModal(false)
       setForm({ name:'', email:'', role:'Functional Consultant', password:'wbs123' })
+      invalidatePage(`page:${id}:team`)
       load()
     } catch (e) {
       showMsg(e.response?.data?.detail || 'Failed to create member', 'error')
@@ -109,6 +113,7 @@ export default function TeamPage() {
         try {
           await api.delete(`/projects/${id}/team/${memberId}`)
           showMsg(`${name} removed from project`)
+          invalidatePage(`page:${id}:team`)
           load()
         } catch (e) {
           showMsg(e.response?.data?.detail || 'Failed to remove member', 'error')
@@ -117,11 +122,7 @@ export default function TeamPage() {
     })
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64 text-gray-400">
-      <i className="ti ti-loader animate-spin text-3xl" />
-    </div>
-  )
+  if (loading && team.length === 0) return <GenericPageSkeleton rows={4} />
 
   return (
     <div className="max-w-3xl">

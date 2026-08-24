@@ -7,11 +7,19 @@
  * Perf (req 4): route every page through the same cache.get/set-backed
  * fetcher so the network round trip only happens once per TTL window, no
  * matter how many pages/filter-changes touch it during that window.
+ *
+ * TTLs extended (perf fix C):
+ *   • projects / users lists: 120 s  (up from 60 s) — global, rarely edited
+ *   • project team:            60 s  (up from 15 s) — per-project
+ *   • custom milestones:       45 s  (up from 15 s) — per-project
+ *   • assignment categories:   120 s — global, almost never changes
  */
 import api from './api'
 import { cache } from './cache'
 
-const TTL = 60 // seconds — master data, safe to hold a little longer than the 30s default
+const TTL = 120       // seconds — global master data
+const MID_TTL = 60   // seconds — project-scoped team
+const SHORT_TTL = 45 // seconds — project-scoped milestones
 
 export async function getProjectsList() {
   const key = 'master:projects-list'
@@ -42,12 +50,6 @@ export async function getGlobalTeams() {
 
 // Project-scoped lists (custom milestones, project team) — keyed per project
 // id so switching between projects doesn't serve stale cross-project data.
-// Shorter TTL than the global lists above: these are actively edited from
-// the Milestone Configuration / Team pages, so we only want to dedupe rapid
-// repeat fetches (filter changes, route bounces) without risking a stale
-// view for long after a real edit happens elsewhere.
-const SHORT_TTL = 15
-
 export async function getProjectCustomMilestones(projectId) {
   const key = `master:custom-milestones:${projectId}`
   const cached = cache.get(key)
@@ -62,7 +64,19 @@ export async function getProjectTeam(projectId) {
   const cached = cache.get(key)
   if (cached) return cached
   const { data } = await api.get(`/projects/${projectId}/team`)
-  cache.set(key, data, SHORT_TTL)
+  cache.set(key, data, MID_TTL)
+  return data
+}
+
+// Fix G: assignment categories are global and almost never change —
+// cache them for 120 s so AssignmentsPage doesn't fire a separate uncached
+// request on every mount.
+export async function getAssignmentCategories() {
+  const key = 'master:assignment-categories'
+  const cached = cache.get(key)
+  if (cached) return cached
+  const { data } = await api.get('/global/assignment-categories')
+  cache.set(key, data, TTL)
   return data
 }
 

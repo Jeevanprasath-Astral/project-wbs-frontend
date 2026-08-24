@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom'
 import { fmtDateTime } from '../../utils/helpers'
 import api from '../../utils/api'
 import clsx from 'clsx'
+import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
+import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
 
 const NOTIF_CONFIG = {
   overdue:    { icon: '🔥', bg: 'bg-rose-50 border-rose-100',     label: 'Overdue' },
@@ -28,7 +30,12 @@ export default function NotificationsPage() {
   const [expandedUser, setExpandedUser] = useState(null)
 
   useEffect(() => {
-    api.get(`/projects/${id}/notifications`).then(r => setItems(r.data)).finally(() => setLoading(false))
+    withPageCache(
+      `page:${id}:notifications`,
+      async () => { const r = await api.get(`/projects/${id}/notifications`); return r.data },
+      (data) => setItems(data),
+      setLoading,
+    )
   }, [id])
 
   const markRead = async (nid) => {
@@ -38,14 +45,7 @@ export default function NotificationsPage() {
 
   const unread = items.filter(n => !n.read).length
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64 text-violet-400">
-      <div className="text-center animate-pulse">
-        <div className="text-4xl mb-3 animate-float">🔔</div>
-        <div className="text-sm font-medium">Loading notifications...</div>
-      </div>
-    </div>
-  )
+  if (loading) return <GenericPageSkeleton rows={6} />
 
   // Requirement 7(b): group by assigned person and show only a COUNT per
   // user by default — full message text is revealed only after clicking

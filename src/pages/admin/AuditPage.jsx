@@ -3,19 +3,43 @@ import { useParams } from 'react-router-dom'
 import { fmtDateTime } from '../../utils/helpers'
 import api from '../../utils/api'
 
+const LIMIT = 50
+
 export default function AuditPage() {
   const { id } = useParams()
   const [logs, setLogs] = useState([])
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
-    api.get(`/projects/${id}/audit`).then(r => setLogs(r.data)).finally(() => setLoading(false))
+    setLoading(true)
+    api.get(`/projects/${id}/audit?limit=${LIMIT}&offset=0`)
+      .then(r => {
+        setLogs(r.data.rows || [])
+        setTotal(r.data.total || 0)
+        setOffset(LIMIT)
+      })
+      .finally(() => setLoading(false))
   }, [id])
+
+  const loadMore = () => {
+    setLoadingMore(true)
+    api.get(`/projects/${id}/audit?limit=${LIMIT}&offset=${offset}`)
+      .then(r => {
+        setLogs(prev => [...prev, ...(r.data.rows || [])])
+        setOffset(o => o + LIMIT)
+      })
+      .finally(() => setLoadingMore(false))
+  }
 
   const filtered = filter
     ? logs.filter(l => l.actor?.toLowerCase().includes(filter) || l.description?.toLowerCase().includes(filter))
     : logs
+
+  const hasMore = logs.length < total && !filter
 
   if (loading) return (
     <div className="flex items-center justify-center h-64 text-violet-400">
@@ -36,7 +60,9 @@ export default function AuditPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900">Audit Trail</h1>
-            <p className="text-xs text-gray-400">{logs.length} records</p>
+            <p className="text-xs text-gray-400">
+              {filter ? `${filtered.length} match${filtered.length !== 1 ? 'es' : ''} in ${logs.length} loaded` : `${logs.length} of ${total} records`}
+            </p>
           </div>
         </div>
         <div className="relative">
@@ -72,6 +98,17 @@ export default function AuditPage() {
           ))}
         </div>
       </div>
+
+      {hasMore && (
+        <div className="mt-4 text-center">
+          <button onClick={loadMore} disabled={loadingMore}
+            className="btn text-xs px-8 py-2">
+            {loadingMore
+              ? '⏳ Loading...'
+              : `⬇️ Load more (${total - logs.length} remaining)`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

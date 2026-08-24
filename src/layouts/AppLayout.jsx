@@ -1,9 +1,11 @@
 import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAppStore } from '../store'
 import { isTeamManager } from '../utils/permissions'
 import api from '../utils/api'
 import clsx from 'clsx'
+import { preloadPage } from '../utils/pageDataStore'
+import { getProjectTeam, getProjectCustomMilestones, getAssignmentCategories, getUsersList } from '../utils/masterData'
 
 const NAV = [
   { icon: '🏁', emoji: true, label: 'Milestone Config', path: 'configure-milestones' },
@@ -27,11 +29,9 @@ export default function AppLayout() {
   useEffect(() => {
     if (!id) return
     const fetchCount = () => {
-      api.get(`/projects/${id}/notifications`)
-        .then(r => {
-          const unread = Array.isArray(r.data) ? r.data.filter(n => !n.read).length : 0
-          setUnreadCount(unread)
-        })
+      // Fix 5: hit the lightweight count endpoint instead of fetching all rows
+      api.get(`/projects/${id}/notifications/count`)
+        .then(r => setUnreadCount(r.data?.unread ?? 0))
         .catch(() => {})
     }
     fetchCount()
@@ -42,6 +42,84 @@ export default function AppLayout() {
   const base = `/projects/${id}`
   const isActive = (path) => location.pathname.includes(path.split('/')[0])
   const goTo = (path) => navigate(`${base}/${path}`)
+
+  // Fix D: fire-and-forget preload when the user hovers a nav item.
+  // preloadPage() checks the cache and only starts a fetch if the entry is
+  // missing or stale — so hovering an already-loaded tab does nothing.
+  const handleHover = useCallback((path) => {
+    if (!id) return
+    switch (path) {
+      case 'dashboard':
+        preloadPage(`page:${id}:dashboard`, async () => {
+          const [dashRes, assignRes, whRes] = await Promise.all([
+            api.get(`/projects/${id}/dashboard`),
+            api.get(`/projects/${id}/assignments/summary`).catch(() => ({ data: null })),
+            api.get(`/work-hours/summary?project_id=${id}`).catch(() => ({ data: null })),
+          ])
+          return { data: { ...dashRes.data, assignmentSummary: assignRes.data }, whSummary: whRes.data }
+        })
+        break
+      case 'assignments':
+        preloadPage(`page:${id}:assignments`, async () => {
+          const [aRes, teamData, msData, cats] = await Promise.all([
+            api.get(`/projects/${id}/assignments`),
+            getProjectTeam(id),
+            getProjectCustomMilestones(id).catch(() => []),
+            getAssignmentCategories().catch(() => []),
+          ])
+          return { assignments: aRes.data, team: teamData, milestones: msData, categories: cats }
+        })
+        break
+      case 'notifications':
+        preloadPage(`page:${id}:notifications`, async () => {
+          const r = await api.get(`/projects/${id}/notifications`)
+          return r.data
+        })
+        break
+      case 'team':
+        preloadPage(`page:${id}:team`, async () => {
+          const [teamRes, usersRes] = await Promise.all([
+            api.get(`/projects/${id}/team`),
+            api.get(`/projects/${id}/all-users`),
+          ])
+          return { team: teamRes.data, allUsers: usersRes.data }
+        })
+        break
+      case 'cost-management':
+        preloadPage(`page:${id}:costs`, async () => {
+          const [cRes, sRes] = await Promise.all([
+            api.get(`/projects/${id}/costs`),
+            api.get(`/projects/${id}/costs/summary`),
+          ])
+          return { costs: cRes.data, summary: sRes.data }
+        })
+        break
+      case 'working-hours': {
+        // Preload with default (no-filter) params
+        const today = new Date().toISOString().split('T')[0]
+        const daysAgo30 = new Date(Date.now() - 30*86400000).toISOString().split('T')[0]
+        const filterKey = `|${daysAgo30}|${today}`
+        preloadPage(`page:${id}:working-hours:${filterKey}`, async () => {
+          const params = new URLSearchParams({ project_id: id, date_from: daysAgo30, date_to: today })
+          const [rRes, sRes, usersData, aRes, msData] = await Promise.all([
+            api.get(`/work-hours?${params}`),
+            api.get(`/work-hours/summary?${params}`),
+            getUsersList(),
+            api.get(`/projects/${id}/assignments`),
+            getProjectCustomMilestones(id),
+          ])
+          return {
+            records: rRes.data, summary: sRes.data, users: usersData,
+            assignments: aRes.data.filter(a => a.status !== 'Completed'),
+            milestones: msData,
+          }
+        })
+        break
+      }
+      default:
+        break
+    }
+  }, [id])
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -83,7 +161,9 @@ export default function AppLayout() {
           {NAV.filter(n => (!n.adminOnly || user?.role === 'Admin') && (!n.teamManagerOnly || isTeamManager(user))).map((n) => {
             const active = isActive(n.path)
             return (
-              <button key={n.path} onClick={() => goTo(n.path)}
+              <button key={n.path}
+                onClick={() => goTo(n.path)}
+                onMouseEnter={() => handleHover(n.path)}
                 className={clsx(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-left transition-all duration-200 mb-0.5',
                   active ? 'text-white font-medium' : 'text-slate-400 hover:text-white hover:bg-white/5'

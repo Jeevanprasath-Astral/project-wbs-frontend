@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAppStore } from '../store'
 
 // Local dev (vite dev, via START_PROJECT_WBS.bat) proxies /api -> http://localhost:8000
 // (see vite.config.js). Production builds fall back to the deployed Render backend
@@ -10,8 +11,9 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const stored = JSON.parse(localStorage.getItem('wbs-store') || '{}')
-  const token = stored?.state?.token
+  // Read token from Zustand in-memory state — avoids JSON.parse(localStorage)
+  // on every request (which was the prior implementation).
+  const token = useAppStore.getState().token
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })

@@ -6,6 +6,8 @@ import api from '../../utils/api'
 import { useAppStore } from '../../store'
 import { isElevated } from '../../utils/permissions'
 import clsx from 'clsx'
+import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
+import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
 
 const emptyForm = { date: new Date().toISOString().slice(0,10), particulars: '', category: COST_CATEGORIES[0], cost: '', attachment: null, remove_attachment: false }
 
@@ -30,16 +32,18 @@ export default function CostManagementPage() {
   const showMsg = (text, type='success') => { setMsg({text,type}); setTimeout(()=>setMsg(null), type==='error' ? 6000 : 3000) }
 
   const load = async () => {
-    setLoading(true)
-    try {
-      const [cRes, sRes] = await Promise.all([
-        api.get(`/projects/${id}/costs`),
-        api.get(`/projects/${id}/costs/summary`),
-      ])
-      setCosts(cRes.data)
-      setSummary(sRes.data)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    await withPageCache(
+      `page:${id}:costs`,
+      async () => {
+        const [cRes, sRes] = await Promise.all([
+          api.get(`/projects/${id}/costs`),
+          api.get(`/projects/${id}/costs/summary`),
+        ])
+        return { costs: cRes.data, summary: sRes.data }
+      },
+      ({ costs, summary }) => { setCosts(costs); setSummary(summary) },
+      setLoading,
+    )
   }
 
   useEffect(() => { load() }, [id])
@@ -83,6 +87,7 @@ export default function CostManagementPage() {
       }
       showMsg(editingId ? 'Cost entry updated! 🎉' : 'Cost entry added! 🎉')
       setShowModal(false)
+      invalidatePage(`page:${id}:costs`)
       load()
     } catch (e) { showMsg(e.response?.data?.detail || 'Failed to save cost entry', 'error') }
     finally { setSaving(false) }
@@ -96,6 +101,7 @@ export default function CostManagementPage() {
         try {
           await api.delete(`/projects/${id}/costs/${c.id}`)
           showMsg('Cost entry deleted')
+          invalidatePage(`page:${id}:costs`)
           load()
         } catch (e) { showMsg(e.response?.data?.detail || 'Failed to delete', 'error') }
       }
@@ -117,6 +123,8 @@ export default function CostManagementPage() {
 
   const apiOrigin = (api.defaults.baseURL || '').replace(/\/api\/?$/, '')
   const attachmentHref = (c) => c.attachment_url ? `${apiOrigin}${c.attachment_url}` : null
+
+  if (loading && costs.length === 0) return <GenericPageSkeleton rows={5} />
 
   return (
     <div>
