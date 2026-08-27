@@ -440,7 +440,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
       isOpen ? 'border-violet-200' : 'border-gray-100')}>
       <div className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-violet-50/20 cursor-pointer" onClick={onSelect}>
         <div className={clsx('w-2 h-2 rounded-full flex-shrink-0', isOpen ? 'bg-violet-600' : 'bg-violet-400')} />
-        <span className="text-sm font-semibold text-gray-800 flex-1">Task {String(t.num).padStart(2,'0')} — {t.name}</span>
+        <span className="text-sm font-semibold text-gray-800 flex-1">Task {String(t.num ?? '').padStart(2,'0')} — {t.name}</span>
         <span className={clsx('text-xs px-1.5 py-0.5 rounded-md',
           t.status==='Completed' ? 'bg-emerald-50 text-emerald-600' : t.status==='In Progress' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')}>
           {t.status||'Not Started'}
@@ -1368,7 +1368,7 @@ function MilestonePicker({ templates, projectId, onConfirm, onClose, onReset, ha
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" checked={taskChecked}
                             onChange={()=>toggleTask(num, t.num, availSubs.map(s=>s.num))} />
-                          <span className="text-xs font-medium text-gray-700">Task {t.num} — {t.name}</span>
+                          <span className="text-xs font-medium text-gray-700">Task {t.num ?? ''} — {t.name}</span>
                         </label>
                       </div>
                     )
