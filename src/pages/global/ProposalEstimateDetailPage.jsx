@@ -1239,7 +1239,7 @@ export default function ProposalEstimateDetailPage() {
               <div>Role / Team</div>
               <div>{estimation.mode === 'days' ? 'Man-Days' : 'Hours'}</div>
               <div>Rate (₹/hr)</div>
-              <div>Proposal Value (₹)</div>
+              <div>Total Cost (₹)</div>
               <div></div>
             </div>
 
