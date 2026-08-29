@@ -127,7 +127,7 @@ export default function TimesheetCalendarPage() {
     load() // also refresh the calendar summary/Worked column
   }
 
-  const WORK_TYPES = ['Billable', 'Non-Billable', 'No Work', 'Training', 'R&D']
+  const WORK_TYPES = ['Billable', 'Non-Billable', 'No Work', 'Training', 'R&D', 'BD']
   const workTypeBadge = (wt) => {
     const map = {
       'Billable':     'bg-emerald-50 text-emerald-600',
@@ -135,6 +135,7 @@ export default function TimesheetCalendarPage() {
       'No Work':      'bg-slate-100 text-slate-500',
       'Training':     'bg-blue-50 text-blue-600',
       'R&D':          'bg-violet-50 text-violet-600',
+      'BD':           'bg-amber-50 text-amber-600',
     }
     return map[wt] || 'bg-gray-100 text-gray-500'
   }
@@ -748,6 +749,7 @@ export default function TimesheetCalendarPage() {
                             <option value="No Work">🚷 No Work</option>
                             <option value="Training">📚 Training</option>
                             <option value="R&D">🔬 R&D</option>
+                            <option value="BD">🤝 BD</option>
                           </select>
                         </div>
                       )}

@@ -129,7 +129,13 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
 
           {!readOnly && (
             <div className="mt-1.5">
-              <input type="file" ref={fileRef} className="hidden" onChange={upload} />
+              <input
+                type="file"
+                ref={fileRef}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.svg,.zip,.rar"
+                onChange={upload}
+              />
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading || !entityId}

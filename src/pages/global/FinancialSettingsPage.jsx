@@ -633,6 +633,10 @@ export default function FinancialSettingsPage() {
                                                         onChange={e => setAddForm(f => ({ ...f, remarks: e.target.value }))}
                                                         onKeyDown={e => { if (e.key === 'Enter') submitAddForm(p.id); if (e.key === 'Escape') cancelAddForm() }} />
                                                     </td>
+                                                    {/* Attachments — placeholder; files can be added after saving */}
+                                                    <td className="px-2 py-1.5 min-w-[120px]">
+                                                      <span className="text-[10px] text-gray-400 italic">Save entry first</span>
+                                                    </td>
                                                     {/* Actions */}
                                                     <td className="px-2 py-1.5">
                                                       <div className="flex items-center gap-1">

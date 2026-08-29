@@ -4,7 +4,7 @@ import { fmtDate, fmtDateTime } from '../../utils/helpers'
 import api from '../../utils/api'
 import { getProjectsList, getUsersList } from '../../utils/masterData'
 import { useAppStore } from '../../store'
-import { isElevated, isAdmin } from '../../utils/permissions'
+import { isElevated } from '../../utils/permissions'
 import clsx from 'clsx'
 
 const PRIORITY_CFG = {
@@ -240,7 +240,7 @@ export default function GlobalAssignments() {
   }
   const closeDetail = () => { setDetailTask(null); setDetailEdit(false) }
 
-  const canEditDetail = (a) => a && (isAdmin(user) || a.assigned_by === user?.id)
+  const canEditDetail = (a) => a && (isElevated(user) || a.assigned_by === user?.id)
 
   const handleDetailSave = async () => {
     if (!detailTask) return

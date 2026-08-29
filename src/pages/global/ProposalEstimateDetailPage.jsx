@@ -4,7 +4,7 @@ import api from '../../utils/api'
 import clsx from 'clsx'
 import { useAppStore } from '../../store'
 
-const CAN_EDIT_ROLES    = new Set(['Admin', 'Project Manager', 'FC Lead', 'TC Lead'])
+const CAN_EDIT_ROLES    = new Set(['Admin', 'Project Manager', 'FC Lead', 'TC Lead', 'BD'])
 const CAN_APPROVE_ROLES = new Set(['Admin', 'Project Manager'])
 const CATEGORIES        = ['ERP', 'Analytics', 'Automation', 'Application', 'Custom Project']
 const FREQUENCIES       = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Ad-hoc', 'On-demand']
@@ -806,7 +806,7 @@ export default function ProposalEstimateDetailPage() {
               {proposal.bd_status || 'No Stage Set'}
             </span>
             {/* Admin: override status (e.g. Archived → Approved) */}
-            {user?.role === 'Admin' && (
+            {(user?.role === 'Admin' || user?.role === 'Project Manager') && (
               <select
                 className="text-xs bg-white/15 text-white/80 border border-white/20 rounded-lg px-2 py-1 cursor-pointer hover:bg-white/20 transition-colors"
                 value={proposal.status}
@@ -823,9 +823,9 @@ export default function ProposalEstimateDetailPage() {
                 ))}
               </select>
             )}
-            {/* Proposal Value = estimation total cost */}
+            {/* Total Cost Value = estimation total cost */}
             <span className="text-white/60 text-xs">
-              Proposal Value: ₹{(estimation.total_cost || 0).toLocaleString('en-IN')}
+              Total Cost Value: ₹{(estimation.total_cost || 0).toLocaleString('en-IN')}
             </span>
             {editable && !editHeader && (
               <button onClick={() => setEditHeader(true)}
@@ -1013,6 +1013,37 @@ export default function ProposalEstimateDetailPage() {
               <p className="text-sm font-medium text-gray-800">{value}</p>
             </div>
           ))}
+          {/* Manual Proposal Value — editable field, not auto-calculated */}
+          <div className="bg-white border border-indigo-100 rounded-xl px-5 py-4 col-span-2">
+            <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wide mb-2">💰 Proposal Value (₹) — Manual Entry</p>
+            {editable ? (
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter proposal value…"
+                  defaultValue={proposal.proposal_value ?? ''}
+                  onBlur={async e => {
+                    const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                    if (val === proposal.proposal_value) return
+                    try {
+                      const { data } = await api.patch(`/proposal-estimates/${proposal.id}`, { proposal_value: val })
+                      setProposal(data)
+                    } catch {}
+                  }}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <span className="text-xs text-gray-400">Auto-saves on blur. Not calculated by the system.</span>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-emerald-700">
+                {proposal.proposal_value != null
+                  ? `₹${proposal.proposal_value.toLocaleString('en-IN')}`
+                  : <span className="text-gray-400 font-normal italic">Not set</span>}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

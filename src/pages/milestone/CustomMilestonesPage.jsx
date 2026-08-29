@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import AttachmentPanel from '../../components/AttachmentPanel'
@@ -62,7 +62,24 @@ const seedHoursDraft = (obj) => ({ ...obj, estimated_hours: obj.own_estimated_ho
 //    list). `showHours` exposes editable Estimated Hours (req 1d — hours are
 //    entered at Subtask/Activity level only); higher levels still show the
 //    computed Estimated/Actual rollup totals read-only. ──────────────────────
-function TimelineFields({ value, onChange, team, showHours, showVarianceReason }) {
+function TimelineFields({ value, onChange, team, showHours, showVarianceReason, multiAssignee }) {
+  const [showAssigneeMenu, setShowAssigneeMenu] = useState(false)
+  const assigneeMenuRef = useRef(null)
+  const selectedAssignees = value.assignee
+    ? value.assignee.split(',').map(s => s.trim()).filter(Boolean)
+    : []
+  const toggleAssignee = (name) => {
+    const next = selectedAssignees.includes(name)
+      ? selectedAssignees.filter(n => n !== name)
+      : [...selectedAssignees, name]
+    onChange({...value, assignee: next.join(', ')})
+  }
+  useEffect(() => {
+    if (!showAssigneeMenu) return
+    const handler = (e) => { if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(e.target)) setShowAssigneeMenu(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showAssigneeMenu])
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
       <div>
@@ -74,8 +91,30 @@ function TimelineFields({ value, onChange, team, showHours, showVarianceReason }
         </select>
       </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-0.5">Assignee</label>
-        {team && team.length > 0 ? (
+        <label className="block text-xs text-gray-400 mb-0.5">Assignee{multiAssignee ? ' (multi)' : ''}</label>
+        {multiAssignee && team && team.length > 0 ? (
+          <div className="relative" ref={assigneeMenuRef}>
+            <button type="button"
+              className="select text-xs h-7 w-full text-left truncate"
+              onClick={() => setShowAssigneeMenu(v => !v)}>
+              {selectedAssignees.length === 0 ? '— Unassigned —' : selectedAssignees.join(', ')}
+            </button>
+            {showAssigneeMenu && (
+              <div className="absolute z-30 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-44 overflow-y-auto min-w-[160px]">
+                <label className="flex items-center gap-2 px-2 py-1 border-b border-gray-100 hover:bg-gray-50 cursor-pointer text-xs text-gray-400 italic"
+                  onClick={() => { onChange({...value, assignee: ''}); setShowAssigneeMenu(false) }}>
+                  — Unassigned —
+                </label>
+                {team.map(m => (
+                  <label key={m.id} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 cursor-pointer text-xs">
+                    <input type="checkbox" checked={selectedAssignees.includes(m.name)} onChange={() => toggleAssignee(m.name)} />
+                    {m.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : team && team.length > 0 ? (
           <select className="select text-xs h-7 w-full" value={value.assignee||''}
             onChange={e=>onChange({...value,assignee:e.target.value})}>
             <option value="">— Unassigned —</option>
@@ -1091,7 +1130,7 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen, isD
       {showTimeline && (
         <div className="px-4 pb-4 border-t border-gray-100 pt-3" onClick={e=>e.stopPropagation()}>
           <div className="text-xs font-semibold text-gray-600 mb-1">Time Management</div>
-          <TimelineFields value={draft} onChange={setDraft} team={team} showVarianceReason />
+          <TimelineFields value={draft} onChange={setDraft} team={team} showVarianceReason multiAssignee />
           <div className="flex items-center gap-2 mt-2">
             <button onClick={saveMsTimeline} className="btn btn-primary text-xs py-1 px-2">💾 Save</button>
             <button onClick={()=>setDraft(ms)} className="btn text-xs py-1 px-2">Cancel</button>
