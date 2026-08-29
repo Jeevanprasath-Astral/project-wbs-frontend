@@ -167,7 +167,7 @@ export default function ProposalEstimatesPage() {
             <option value="Negotiating - Won">Won</option>
             <option value="Negotiating - Lost">Lost</option>
           </optgroup>
-          <option value="Feature Follow-up">Feature Follow-up</option>
+          <option value="Future Follow-up">Future Follow-up</option>
         </select>
       </div>
 
@@ -176,15 +176,16 @@ export default function ProposalEstimatesPage() {
         {/* Table header */}
         <div
           className="grid text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 px-4 py-3 border-b border-gray-200"
-          style={{ gridTemplateColumns: '2fr 1.4fr 1.1fr 0.9fr 1fr 1fr 0.7fr' }}
+          style={{ gridTemplateColumns: '1fr 2fr 1.4fr 1.1fr 0.9fr 1fr 1fr 0.9fr' }}
         >
+          <div>Proposal No.</div>
           <div>Client</div>
           <div>Project</div>
           <div>Category</div>
-          <div>Status</div>
+          <div>BD Stage</div>
           <div>Created By</div>
           <div>Created Date</div>
-          <div>Version</div>
+          <div>Proposal Value</div>
         </div>
 
         {loading ? (
@@ -212,8 +213,11 @@ export default function ProposalEstimatesPage() {
                 'grid items-center px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors border-b border-gray-100 last:border-0',
                 idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
               )}
-              style={{ gridTemplateColumns: '2fr 1.4fr 1.1fr 0.9fr 1fr 1fr 0.7fr' }}
+              style={{ gridTemplateColumns: '1fr 2fr 1.4fr 1.1fr 0.9fr 1fr 1fr 0.9fr' }}
             >
+              <div className="text-xs font-mono text-indigo-700 font-semibold truncate">
+                {p.proposal_number || '—'}
+              </div>
               <div className="min-w-0">
                 <p className="font-semibold text-gray-900 text-sm truncate">{p.client_name}</p>
               </div>
@@ -227,10 +231,18 @@ export default function ProposalEstimatesPage() {
                   </span>
                 ) : <span className="text-gray-300 text-sm">—</span>}
               </div>
-              <div><StatusBadge status={p.status} /></div>
+              <div>
+                {p.bd_status ? (
+                  <span className="text-xs text-gray-700 font-medium truncate">{p.bd_status}</span>
+                ) : <span className="text-gray-300 text-sm">—</span>}
+              </div>
               <div className="text-sm text-gray-600 truncate">{p.creator_name || '—'}</div>
               <div className="text-sm text-gray-500">{fmtDate(p.created_at)}</div>
-              <div className="text-sm text-gray-500 font-medium">v{p.version}</div>
+              <div className="text-sm text-emerald-700 font-semibold">
+                {p.estimation_total_cost != null
+                  ? `₹${p.estimation_total_cost.toLocaleString('en-IN')}`
+                  : '—'}
+              </div>
             </div>
           ))
         )}

@@ -73,8 +73,9 @@ export default function AttachmentPanel({ entityType, entityId, readOnly = false
     })
   }
 
-  // URL comes directly from Cloudinary (returned by the backend)
-  const downloadUrl = (a) => a.url || '#'
+  // Use the backend download endpoint which adds fl_attachment so browsers
+  // always prompt Save-As instead of opening the file in a new tab.
+  const downloadUrl = (a) => a.download_url || a.url || '#'
 
   const count = attachments.length
 

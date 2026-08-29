@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { useAppStore } from '../../store'
 import { canAccessFinancialSettings } from '../../utils/permissions'
+import AttachmentPanel from '../../components/AttachmentPanel'
 import clsx from 'clsx'
 
 const BILLING_TYPES = [
@@ -270,7 +271,7 @@ export default function FinancialSettingsPage() {
   if (!canAccessFinancialSettings(user)) return null
 
   const tdInput = 'input text-xs h-7 py-0 px-1.5 min-w-0'
-  const NCOLS = 9
+  const NCOLS = 10
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -421,6 +422,7 @@ export default function FinancialSettingsPage() {
                                                 <th className="text-left px-3 py-2 font-medium text-violet-700">Billing Type</th>
                                                 <th className="text-left px-3 py-2 font-medium text-violet-700">Description</th>
                                                 <th className="text-left px-3 py-2 font-medium text-violet-700">Remarks</th>
+                                                <th className="text-left px-3 py-2 font-medium text-violet-700">Attachments</th>
                                                 <th className="px-3 py-2 w-16"></th>
                                               </tr>
                                             </thead>
@@ -508,6 +510,10 @@ export default function FinancialSettingsPage() {
                                                           onChange={e => setEditEntry(v => ({ ...v, remarks: e.target.value }))}
                                                           onKeyDown={e => { if (e.key === 'Enter') submitEditEntry(); if (e.key === 'Escape') cancelEditEntry() }} />
                                                       </td>
+                                                      {/* Attachments (shown in read-only while editing) */}
+                                                      <td className="px-2 py-1.5 min-w-[120px]">
+                                                        <AttachmentPanel entityType="billing_entry" entityId={entry.id} />
+                                                      </td>
                                                       {/* Actions */}
                                                       <td className="px-2 py-1.5">
                                                         <div className="flex items-center gap-1">
@@ -544,6 +550,9 @@ export default function FinancialSettingsPage() {
                                                     </td>
                                                     <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
                                                     <td className="px-3 py-2 text-gray-400 italic">{entry.remarks || '—'}</td>
+                                                    <td className="px-3 py-2 min-w-[120px]">
+                                                      <AttachmentPanel entityType="billing_entry" entityId={entry.id} />
+                                                    </td>
                                                     <td className="px-3 py-2">
                                                       <div className="flex items-center gap-1.5">
                                                         <button onClick={() => startEditEntry(entry, p.id)}

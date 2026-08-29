@@ -100,7 +100,7 @@ const BD_STAGE_STYLE = {
   'Proposal':           'bg-indigo-100 text-indigo-700 border-indigo-200',
   'Negotiating - Won':  'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Negotiating - Lost': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Feature Follow-up':  'bg-amber-100 text-amber-700 border-amber-200',
+  'Future Follow-up':  'bg-amber-100 text-amber-700 border-amber-200',
 }
 
 const BD_STAGE_OPTIONS = [
@@ -111,7 +111,7 @@ const BD_STAGE_OPTIONS = [
   { value: 'Proposal',           label: 'Proposal',           group: null },
   { value: 'Negotiating - Won',  label: 'Won',                group: 'Negotiating' },
   { value: 'Negotiating - Lost', label: 'Lost',               group: 'Negotiating' },
-  { value: 'Feature Follow-up',  label: 'Feature Follow-up',  group: null },
+  { value: 'Future Follow-up',  label: 'Future Follow-up',  group: null },
 ]
 
 function fmtDate(iso) {
@@ -518,8 +518,9 @@ export default function ProposalEstimateDetailPage() {
 
   const canEdit    = user && CAN_EDIT_ROLES.has(user.role)
   const canApprove = user && CAN_APPROVE_ROLES.has(user.role)
-  const isLocked   = proposal?.status === 'Approved' || proposal?.status === 'Archived'
-  const editable   = canEdit && !isLocked
+  // Editing is unlocked for all CAN_EDIT_ROLES regardless of proposal status.
+  // Approving/archiving still requires CAN_APPROVE_ROLES (enforced via separate buttons).
+  const editable   = !!canEdit
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -795,10 +796,37 @@ export default function ProposalEstimateDetailPage() {
             )}
           </div>
           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-            <span className={clsx('px-3 py-1 rounded-full text-xs font-semibold', STATUS_STYLE[proposal.status])}>
-              {proposal.status}
+            {/* BD Stages badge — primary status shown in header */}
+            <span className={clsx(
+              'px-3 py-1 rounded-full text-xs font-semibold border',
+              proposal.bd_status
+                ? BD_STAGE_STYLE[proposal.bd_status] || 'bg-gray-100 text-gray-600 border-gray-200'
+                : 'bg-white/15 text-white/70 border-white/20'
+            )}>
+              {proposal.bd_status || 'No Stage Set'}
             </span>
-            <span className="text-white/60 text-xs">v{proposal.version}</span>
+            {/* Admin: override status (e.g. Archived → Approved) */}
+            {user?.role === 'Admin' && (
+              <select
+                className="text-xs bg-white/15 text-white/80 border border-white/20 rounded-lg px-2 py-1 cursor-pointer hover:bg-white/20 transition-colors"
+                value={proposal.status}
+                onChange={async e => {
+                  try {
+                    const { data } = await api.patch(`/proposal-estimates/${proposal.id}/force-status`, { status: e.target.value })
+                    setProposal(data)
+                  } catch { alert('Failed to override status') }
+                }}
+                title="Admin: override status"
+              >
+                {['Draft','Submitted','Approved','Rejected','Archived'].map(s => (
+                  <option key={s} value={s} className="text-gray-800">{s}</option>
+                ))}
+              </select>
+            )}
+            {/* Proposal Value = estimation total cost */}
+            <span className="text-white/60 text-xs">
+              Proposal Value: ₹{(estimation.total_cost || 0).toLocaleString('en-IN')}
+            </span>
             {editable && !editHeader && (
               <button onClick={() => setEditHeader(true)}
                 className="p-1.5 text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/10">
@@ -883,7 +911,7 @@ export default function ProposalEstimateDetailPage() {
 
       {/* BD Status row */}
       <div className="px-6 py-2.5 border-t border-gray-100 bg-gradient-to-r from-slate-50 to-white flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-semibold text-gray-500 flex-shrink-0">🎯 BD Status</span>
+        <span className="text-xs font-semibold text-gray-500 flex-shrink-0">🎯 BD Stages</span>
         {/* Two-level dropdown using optgroup for Negotiating sub-options */}
         <select
           value={proposal.bd_status || ''}
@@ -902,7 +930,7 @@ export default function ProposalEstimateDetailPage() {
             <option value="Negotiating - Won">Won</option>
             <option value="Negotiating - Lost">Lost</option>
           </optgroup>
-          <option value="Feature Follow-up">Feature Follow-up</option>
+          <option value="Future Follow-up">Future Follow-up</option>
         </select>
 
         {/* Stage badge */}
@@ -1180,7 +1208,7 @@ export default function ProposalEstimateDetailPage() {
               <div>Role / Team</div>
               <div>{estimation.mode === 'days' ? 'Man-Days' : 'Hours'}</div>
               <div>Rate (₹/hr)</div>
-              <div>Total Cost (₹)</div>
+              <div>Proposal Value (₹)</div>
               <div></div>
             </div>
 
@@ -1278,7 +1306,7 @@ export default function ProposalEstimateDetailPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">₹{(estimation.total_cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</p>
-                    <p className="text-xs text-slate-300 mt-0.5">Total Cost</p>
+                    <p className="text-xs text-slate-300 mt-0.5">Proposal Value</p>
                     <p className="text-xs text-slate-400 mt-0.5">@avg ₹{(estimation.total_hours || 0) > 0 ? ((estimation.total_cost || 0) / (estimation.total_hours || 1)).toFixed(0) : 0}/hr</p>
                   </div>
                   <div>
