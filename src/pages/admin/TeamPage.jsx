@@ -36,7 +36,7 @@ function Avatar({ name, size = 'md' }) {
 export default function TeamPage() {
   const { id } = useParams()
   const currentUser = useAppStore(s => s.user)
-  const canManage = isTeamManager(currentUser)
+  const canManage = isTeamManager(currentUser) || currentUser?.role === 'FC Lead'
   const [team, setTeam] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [loading, setLoading] = useState(true)
