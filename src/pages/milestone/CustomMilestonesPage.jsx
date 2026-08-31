@@ -553,7 +553,7 @@ function TaskBlock({ t, ms, projectId, onUpdate, team, isOpen, onSelect }) {
                 Date &amp; Time Management
               </div>
               {/* Bug #1: showHours makes estimated_hours editable at task level */}
-              <TimelineFields value={draft} onChange={setDraft} team={team} showHours />
+              <TimelineFields value={draft} onChange={setDraft} team={team} showHours multiAssignee />
               <div className="flex items-center gap-2 mt-2">
                 <button onClick={saveTimeline} className="btn btn-primary text-xs py-1 px-2">💾 Save</button>
                 <button onClick={()=>setDraft(seedHoursDraft(t))} className="btn text-xs py-1 px-2">Cancel</button>

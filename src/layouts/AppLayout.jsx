@@ -23,7 +23,16 @@ export default function AppLayout() {
   const { id } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, activeProject, unreadCount, setUnreadCount, logout } = useAppStore()
+  const { user, activeProject, unreadCount, setUnreadCount, logout, patchUser } = useAppStore()
+
+  // Refresh role permissions on mount so users who return via persisted token
+  // always have the latest permission matrix (Admin changes take effect immediately).
+  useEffect(() => {
+    if (!user) return
+    api.get('/auth/me')
+      .then(r => patchUser(r.data))
+      .catch(() => {})
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll unread notification count every 60 s so the badge stays live
   useEffect(() => {

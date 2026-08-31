@@ -8,6 +8,8 @@ export const useAppStore = create(
       user: null,
       token: null,
       setUser: (user, token) => set({ user, token }),
+      // Merge updated fields into user without losing token (used by permission refresh)
+      patchUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : patch })),
       logout: () => set({ user: null, token: null }),
 
       // Active project

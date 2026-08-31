@@ -28,6 +28,170 @@ const PERMISSIONS = {
   'Client':                ['View dashboard','View reports','Milestone sign-off'],
 }
 
+/* ── Role Access Panel ─────────────────────────────────────────────────────── */
+const PERM_ACTIONS = [
+  { key: 'view',   label: 'V', title: 'View',   color: 'text-blue-600',  bg: 'bg-blue-600'  },
+  { key: 'create', label: 'C', title: 'Create', color: 'text-green-600', bg: 'bg-green-600' },
+  { key: 'edit',   label: 'E', title: 'Edit',   color: 'text-amber-600', bg: 'bg-amber-600' },
+  { key: 'delete', label: 'D', title: 'Delete', color: 'text-rose-600',  bg: 'bg-rose-600'  },
+]
+const DISPLAY_ROLES = [
+  'Project Manager','FC Lead','TC Lead','BD','HR',
+  'Associate Data Analyst','Associate','Functional Consultant','Technical Team','Client',
+]
+
+function RoleAccessPanel({ currentUser }) {
+  const [matrix, setMatrix]     = useState(null)
+  const [modules, setModules]   = useState([])
+  const [saving, setSaving]     = useState({})
+  const [msg, setMsg]           = useState(null)
+  const canManage = ['Admin','Project Manager','HR'].includes(currentUser?.role)
+
+  useEffect(() => {
+    if (!canManage) return
+    api.get('/role-permissions')
+      .then(r => { setModules(r.data.modules); setMatrix(r.data.matrix) })
+      .catch(e => console.error('role-permissions fetch:', e))
+  }, [])
+
+  const showMsg = (text, type = 'success') => {
+    setMsg({ text, type })
+    setTimeout(() => setMsg(null), 2500)
+  }
+
+  const toggle = async (role, moduleKey, action) => {
+    if (role === 'Admin') return
+    const key = `${role}_${moduleKey}`
+    const newVal = !matrix[role][moduleKey][action]
+    // Optimistic update
+    setMatrix(m => ({ ...m, [role]: { ...m[role], [moduleKey]: { ...m[role][moduleKey], [action]: newVal } } }))
+    setSaving(s => ({ ...s, [key]: true }))
+    try {
+      await api.put(`/role-permissions/${encodeURIComponent(role)}/${moduleKey}`, { [`can_${action}`]: newVal })
+      showMsg(`✓ Saved`)
+    } catch {
+      // Rollback
+      setMatrix(m => ({ ...m, [role]: { ...m[role], [moduleKey]: { ...m[role][moduleKey], [action]: !newVal } } }))
+      showMsg('Save failed', 'error')
+    } finally {
+      setSaving(s => { const n = { ...s }; delete n[key]; return n })
+    }
+  }
+
+  const resetRole = async (role) => {
+    if (!window.confirm(`Reset all permissions for "${role}" to factory defaults?`)) return
+    try {
+      await api.post(`/role-permissions/reset/${encodeURIComponent(role)}`)
+      const r = await api.get('/role-permissions')
+      setMatrix(r.data.matrix)
+      showMsg(`"${role}" reset to defaults`)
+    } catch { showMsg('Reset failed', 'error') }
+  }
+
+  if (!canManage) return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+      <div className="text-5xl mb-3">🔒</div>
+      <p className="text-sm text-gray-500">Role access settings are managed by Admin, Project Manager, or HR.</p>
+    </div>
+  )
+
+  if (!matrix) return (
+    <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
+      <span className="animate-spin text-xl">⟳</span>
+      <span className="text-sm">Loading permission matrix…</span>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Toast */}
+      {msg && (
+        <div className={`text-xs px-4 py-2 rounded-xl font-medium ${msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3 flex items-center gap-6 flex-wrap">
+        <span className="text-xs font-semibold text-gray-600">Action keys:</span>
+        {PERM_ACTIONS.map(a => (
+          <span key={a.key} className="flex items-center gap-1 text-xs">
+            <span className={`font-bold ${a.color}`}>{a.label}</span>
+            <span className="text-gray-400">= {a.title}</span>
+          </span>
+        ))}
+        <span className="text-xs text-gray-400 ml-auto italic">Click any letter to toggle. Admin is always full-access (locked).</span>
+      </div>
+
+      {/* Matrix */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+        <table className="text-xs border-collapse" style={{ minWidth: '900px', width: '100%' }}>
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50/60">
+              <th className="text-left px-4 py-3 font-semibold text-gray-600 sticky left-0 bg-gray-50/60 w-44">Module</th>
+              {/* Admin — locked */}
+              <th className="px-3 py-3 text-center border-l border-gray-100 w-16">
+                <div className="font-semibold text-violet-700 text-xs">👑</div>
+                <div className="text-xs text-violet-600 font-medium">Admin</div>
+                <div className="text-gray-300 text-xs">locked</div>
+              </th>
+              {DISPLAY_ROLES.map(role => (
+                <th key={role} className="px-1 py-3 text-center border-l border-gray-100 w-20">
+                  <div className="text-xs font-semibold text-gray-700 truncate max-w-16 mx-auto" title={role}>
+                    {role.length > 12 ? role.split(' ').map(w => w[0]).join('') : role.split(' ')[0]}
+                  </div>
+                  <div className="text-gray-400 text-xs truncate max-w-16 mx-auto font-normal" title={role}>
+                    {role.length > 12 ? role.split(' ').slice(1).join(' ') || '' : role.split(' ').slice(1).join(' ')}
+                  </div>
+                  <button onClick={() => resetRole(role)} title={`Reset "${role}" to defaults`}
+                    className="mt-1 text-gray-300 hover:text-violet-500 text-sm transition-colors" style={{ lineHeight: 1 }}>↺</button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {modules.map((mod, mi) => (
+              <tr key={mod.key} className={`border-b border-gray-50 ${mi % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                <td className="px-4 py-2.5 font-medium text-gray-700 sticky left-0 bg-inherit">{mod.label}</td>
+                {/* Admin cell — always all */}
+                <td className="px-1 py-2.5 border-l border-gray-100">
+                  <div className="flex gap-0.5 justify-center">
+                    {PERM_ACTIONS.map(a => (
+                      <span key={a.key} className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${a.color}`} title={a.title}>{a.label}</span>
+                    ))}
+                  </div>
+                </td>
+                {DISPLAY_ROLES.map(role => {
+                  const cell = matrix[role]?.[mod.key] || {}
+                  const savKey = `${role}_${mod.key}`
+                  return (
+                    <td key={role} className="px-1 py-2.5 border-l border-gray-100">
+                      <div className="flex gap-0.5 justify-center">
+                        {PERM_ACTIONS.map(a => (
+                          <button key={a.key}
+                            onClick={() => toggle(role, mod.key, a.key)}
+                            disabled={!!saving[savKey]}
+                            title={`${role} → ${mod.label}: ${a.title} = ${cell[a.key] ? 'ON' : 'OFF'}`}
+                            className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold transition-all border ${
+                              cell[a.key]
+                                ? `${a.color} border-current`
+                                : 'text-gray-200 border-gray-200 hover:text-gray-400 hover:border-gray-300'
+                            } ${saving[savKey] ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                          >{a.label}</button>
+                        ))}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function GlobalTeam() {
   const navigate = useNavigate()
   const currentUser = useAppStore(s => s.user)
@@ -58,6 +222,7 @@ export default function GlobalTeam() {
   const [removeLoading, setRemoveLoading] = useState(false)
   const [removeConfirming, setRemoveConfirming] = useState(false)
   const [confirmState, setConfirmState] = useState(null)   // { title, message, onConfirm }
+  const [activeTab, setActiveTab] = useState('team')
 
   // Combined role list: built-in ALL_ROLES + any custom roles from DB
   const allRoles = [...ROLES, ...customRoles.map(r => r.name).filter(n => !ROLES.includes(n))]
@@ -279,6 +444,28 @@ export default function GlobalTeam() {
 
       <div className="max-w-screen-xl mx-auto px-6 py-5">
 
+        {/* ── Tab Navigation ── */}
+        <div className="flex gap-1 bg-white border border-gray-100 shadow-sm rounded-2xl p-1 mb-5 w-fit">
+          {[
+            { key: 'team',   icon: '👥', label: 'Team Members' },
+            { key: 'access', icon: '🔐', label: 'Role Access',  managerOnly: true },
+          ].filter(t => !t.managerOnly || isAdmin).map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === t.key
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Role Access Panel ── */}
+        {activeTab === 'access' && <RoleAccessPanel currentUser={currentUser} />}
+
+        {activeTab !== 'access' && (<>
+
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-5 gap-3 mb-5 stagger">
@@ -468,6 +655,7 @@ export default function GlobalTeam() {
             })}
           </div>
         )}
+        </>)}
       </div>
 
       {/* Modal */}

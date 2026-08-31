@@ -41,3 +41,21 @@ export const isAdmin = (user) => user?.role === 'Admin'
 export const canAccessFinancialSettings = (user) => FINANCIAL_SETTINGS_ROLES.has(user?.role)
 // Standard (non-elevated) user — used for canAssign / canComment type checks
 export const isStandard = (user) => STANDARD_ROLES.has(user?.role)
+
+/**
+ * DB-driven permission check.
+ * user.permissions comes from /auth/me → get_permissions_for_role().
+ * Admin is always granted (enforced on backend too), so we short-circuit here.
+ *
+ * @param {object} user       - current user object (must have .role + .permissions)
+ * @param {string} module     - e.g. 'proposals', 'financial_settings', 'milestones'
+ * @param {string} action     - 'view' | 'create' | 'edit' | 'delete'
+ * @returns {boolean}
+ */
+export const canAccess = (user, module, action) => {
+  if (!user) return false
+  if (user.role === 'Admin') return true
+  const perms = user.permissions
+  if (!perms || !perms[module]) return false
+  return !!perms[module][action]
+}

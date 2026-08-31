@@ -429,7 +429,13 @@ export default function LoginPage() {
     setLoading(true); setError('')
     try {
       const res = await api.post('/auth/login', form)
+      // Store basic user + token first (token needed so /me is authenticated)
       setUser(res.data.user, res.data.token)
+      // Fetch full user including DB-driven permissions
+      try {
+        const meRes = await api.get('/auth/me')
+        setUser(meRes.data, res.data.token)
+      } catch (_) { /* non-fatal: continue without permissions */ }
       setSplashRole(res.data.user.role)
       setSplashUser(res.data.user.name)
       setTimeout(() => navigate('/'), 2600)
