@@ -7,50 +7,16 @@ const monthStart = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 const today = () => new Date().toISOString().split('T')[0]
-
-const KPI_CARDS = [
-  {
-    icon: '⏱️',
-    label: 'Total Hours',
-    desc: 'All hours logged by the team member across every project in the selected period, including non-billable time.',
-    color: 'bg-blue-50 border-blue-100',
-  },
-  {
-    icon: '💼',
-    label: 'Billable Hours',
-    desc: 'Hours marked as billable in the Timesheet Calendar or Work Hours page. These are the hours you can invoice the client for.',
-    color: 'bg-emerald-50 border-emerald-100',
-  },
-  {
-    icon: '📉',
-    label: 'Non-Billable Hours',
-    desc: 'Total Hours minus Billable Hours. Includes internal meetings, training, admin work, and hours explicitly marked non-billable.',
-    color: 'bg-amber-50 border-amber-100',
-  },
-  {
-    icon: '📊',
-    label: 'Utilization %',
-    desc: 'Billable Hours ÷ Total Hours × 100. Shows how much of logged time is revenue-generating. Green ≥ 80 %, Amber 50–79 %, Red < 50 %.',
-    color: 'bg-violet-50 border-violet-100',
-  },
-  {
-    icon: '💰',
-    label: 'Manpower Cost (₹)',
-    desc: 'Total Hours × the member\'s Cost Rate (set in Financial Settings). Represents the internal cost of employing this person on the project.',
-    color: 'bg-rose-50 border-rose-100',
-  },
-  {
-    icon: '🗂️',
-    label: '# Projects',
-    desc: 'Number of distinct projects this person logged hours against in the selected period.',
-    color: 'bg-slate-50 border-slate-100',
-  },
-]
+const fmt = (v, dec = 1) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec }))
+const fmtCost = v => (v == null ? '—' : Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+const pct = v => v == null ? '—' : `${v}%`
 
 export default function TeamUtilizationPage() {
-  const [options,  setOptions]  = useState({ users: [], roles: [], projects: [] })
-  const [loading,  setLoading]  = useState(true)
+  const [options,   setOptions]   = useState({ users: [], roles: [], projects: [] })
+  const [loading,   setLoading]   = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [rows,      setRows]      = useState([])
+  const [loadingData, setLoadingData] = useState(false)
 
   const [filters, setFilters] = useState({
     start_date: monthStart(),
@@ -62,24 +28,32 @@ export default function TeamUtilizationPage() {
 
   const setF = (k, v) => setFilters(f => ({ ...f, [k]: v }))
 
-  const load = useCallback(async () => {
-    try {
-      const res = await api.get('/team-utilization-report/filter-options')
-      setOptions(res.data)
-    } catch { /* silent */ }
-    finally { setLoading(false) }
+  useEffect(() => {
+    api.get('/team-utilization-report/filter-options')
+      .then(r => setOptions(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const loadData = useCallback(async (f) => {
+    setLoadingData(true)
+    try {
+      const params = new URLSearchParams()
+      if (f.start_date) params.set('start_date', f.start_date)
+      if (f.end_date)   params.set('end_date',   f.end_date)
+      if (f.role)       params.set('role',        f.role)
+      if (f.user_id)    params.set('user_id',     f.user_id)
+      if (f.project_id) params.set('project_id',  f.project_id)
+      const r = await api.get(`/team-utilization-report/data?${params}`)
+      setRows(r.data.rows || [])
+    } catch { setRows([]) }
+    finally { setLoadingData(false) }
+  }, [])
 
-  // When role changes, clear user selection (user might not match new role)
-  const handleRoleChange = (v) => {
-    setFilters(f => ({ ...f, role: v, user_id: '' }))
-  }
+  useEffect(() => { loadData(filters) }, [filters, loadData])
 
-  const filteredUsers = filters.role
-    ? options.users.filter(u => u.role === filters.role)
-    : options.users
+  const handleRoleChange = v => setFilters(f => ({ ...f, role: v, user_id: '' }))
+  const filteredUsers = filters.role ? options.users.filter(u => u.role === filters.role) : options.users
 
   const handleExport = async () => {
     setExporting(true)
@@ -90,15 +64,10 @@ export default function TeamUtilizationPage() {
       if (filters.role)       params.set('role',       filters.role)
       if (filters.user_id)    params.set('user_id',    filters.user_id)
       if (filters.project_id) params.set('project_id', filters.project_id)
-
-      const res = await api.get(`/team-utilization-report/export?${params}`, {
-        responseType: 'blob',
-      })
+      const res = await api.get(`/team-utilization-report/export?${params}`, { responseType: 'blob' })
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
-      a.href = url
-      a.download = 'team-utilization-report.xlsx'
-      a.click()
+      a.href = url; a.download = 'team-utilization-report.xlsx'; a.click()
       URL.revokeObjectURL(url)
     } catch { /* silent */ }
     finally { setExporting(false) }
@@ -120,115 +89,104 @@ export default function TeamUtilizationPage() {
 
       <div className="max-w-screen-xl mx-auto px-6 py-5 space-y-5">
 
-        {/* Info banner */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-3 text-xs text-blue-800 leading-relaxed">
-          <span className="font-semibold">What this report shows:</span>{' '}
-          Hours logged by each team member across projects for the selected period, split into billable and non-billable time.
-          The Excel export has two sheets — <strong>Summary</strong> (one row per person) and <strong>By Project</strong> (per person per project).
-          Row colours indicate utilization: <span className="inline-block px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">Green ≥ 80 %</span>{' '}
-          <span className="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">Amber 50–79 %</span>{' '}
-          <span className="inline-block px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">Red &lt; 50 %</span>.
-        </div>
-
-        {/* Filters */}
+        {/* Filters + Export */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filters</div>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filters</div>
+            <button onClick={handleExport} disabled={exporting || loading}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+              {exporting ? <><span className="animate-spin">⟳</span> Generating…</> : <>📥 Export to Excel</>}
+            </button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Start Date</label>
-              <input type="date" className="input text-xs h-8"
-                value={filters.start_date}
-                onChange={e => {
-                  const v = e.target.value
-                  setF('start_date', v)
-                  if (v && filters.end_date && v > filters.end_date) setF('end_date', '')
-                }} />
+              <input type="date" className="input text-xs h-8" value={filters.start_date}
+                onChange={e => { const v = e.target.value; setF('start_date', v); if (v && filters.end_date && v > filters.end_date) setF('end_date', '') }} />
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">End Date</label>
-              <input type="date" className="input text-xs h-8"
-                value={filters.end_date}
-                min={filters.start_date || undefined}
-                onChange={e => {
-                  if (filters.start_date && e.target.value && e.target.value < filters.start_date) return
-                  setF('end_date', e.target.value)
-                }} />
+              <input type="date" className="input text-xs h-8" value={filters.end_date} min={filters.start_date || undefined}
+                onChange={e => { if (filters.start_date && e.target.value && e.target.value < filters.start_date) return; setF('end_date', e.target.value) }} />
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Role / Team</label>
-              <select className="select text-xs h-8"
-                value={filters.role}
-                onChange={e => handleRoleChange(e.target.value)}>
+              <select className="select text-xs h-8" value={filters.role} onChange={e => handleRoleChange(e.target.value)}>
                 <option value="">All Roles</option>
                 {options.roles.map(r => <option key={r}>{r}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Team Member</label>
-              <select className="select text-xs h-8"
-                value={filters.user_id}
-                onChange={e => setF('user_id', e.target.value)}>
+              <select className="select text-xs h-8" value={filters.user_id} onChange={e => setF('user_id', e.target.value)}>
                 <option value="">All Members</option>
-                {filteredUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
+                {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Project</label>
-              <select className="select text-xs h-8"
-                value={filters.project_id}
-                onChange={e => setF('project_id', e.target.value)}>
+              <select className="select text-xs h-8" value={filters.project_id} onChange={e => setF('project_id', e.target.value)}>
                 <option value="">All Projects</option>
-                {options.projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {options.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-
           </div>
         </div>
 
-        {/* KPI explanation cards */}
-        <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Report Columns Explained</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {KPI_CARDS.map(c => (
-              <div key={c.label} className={clsx('rounded-2xl border px-4 py-3', c.color)}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-lg">{c.icon}</span>
-                  <span className="text-xs font-semibold text-gray-800">{c.label}</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">{c.desc}</p>
-              </div>
-            ))}
+        {/* Preview Table */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
+            <div className="text-xs font-semibold text-gray-700">👥 Preview</div>
+            <div className="text-xs text-gray-400">{loadingData ? 'Loading…' : `${rows.length} member${rows.length !== 1 ? 's' : ''}`}</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-violet-50 text-violet-700">
+                  {['Name','Role','Total Hrs','Billable Hrs','Non-Billable Hrs','Util %','Manpower Cost (₹)','# Projects'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loadingData ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400 animate-pulse">Loading data…</td></tr>
+                ) : rows.length === 0 ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400 italic">No work hours found for the selected filters.</td></tr>
+                ) : rows.map((r, i) => {
+                  const utilColor = r.util_pct == null ? 'text-gray-400' :
+                    r.util_pct >= 80 ? 'bg-green-100 text-green-700' :
+                    r.util_pct >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  return (
+                    <tr key={i} className={clsx('border-b border-gray-50 hover:bg-violet-50 transition-colors', i % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                      <td className="px-3 py-2 font-medium text-gray-800">{r.name}</td>
+                      <td className="px-3 py-2 text-gray-500">{r.role}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{fmt(r.total_hours)}</td>
+                      <td className="px-3 py-2 text-right text-emerald-700 font-medium">{fmt(r.billable_hours)}</td>
+                      <td className="px-3 py-2 text-right text-gray-500">{fmt(r.non_billable)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={clsx('px-1.5 py-0.5 rounded font-medium', utilColor)}>{pct(r.util_pct)}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">{fmtCost(r.manpower_cost)}</td>
+                      <td className="px-3 py-2 text-right text-gray-500">{r.project_count}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-4 px-5 py-2 text-xs text-gray-400 border-t border-gray-50">
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-100 inline-block"></span>≥ 80 % utilized</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-100 inline-block"></span>50–79 %</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-100 inline-block"></span>&lt; 50 %</span>
           </div>
         </div>
 
         {/* Setup reminder */}
         <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-3 text-xs text-amber-800">
           <span className="font-semibold">Before exporting:</span>{' '}
-          Ensure <strong>Cost Rates</strong> are set for each team member in{' '}
-          <strong>Financial Settings</strong> (Admin menu) — otherwise Manpower Cost will show as ₹0.
-          Hours are sourced from the <strong>Timesheet Calendar</strong> and <strong>Work Hours</strong> pages.
-        </div>
-
-        {/* Export button */}
-        <div className="flex justify-end">
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
-            {exporting
-              ? <><span className="animate-spin">⟳</span> Generating…</>
-              : <>📥 Export to Excel</>}
-          </button>
+          Ensure <strong>Cost Rates</strong> are set for each team member in Financial Settings — otherwise Manpower Cost will show as ₹0.
         </div>
 
       </div>

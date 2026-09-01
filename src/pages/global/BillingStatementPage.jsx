@@ -7,55 +7,19 @@ const monthStart = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 const today = () => new Date().toISOString().split('T')[0]
+const fmt = v => (v == null ? '—' : Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
 const BILLING_TYPES = [
   'Milestone Payment', 'New Requirements', 'Change Request',
   'Due Payment', 'Overtime Charges', 'Additional Scope', 'Miscellaneous',
 ]
 
-const KPI_CARDS = [
-  {
-    icon: '📅',
-    label: 'Date',
-    desc: 'The date this billing entry was recorded — typically the date an invoice was raised or a payment milestone was reached.',
-    color: 'bg-slate-50 border-slate-100',
-  },
-  {
-    icon: '🏷️',
-    label: 'Billing Type',
-    desc: 'Category of the billing entry — Milestone Payment, Change Request, Additional Scope, Due Payment, Overtime Charges, etc.',
-    color: 'bg-blue-50 border-blue-100',
-  },
-  {
-    icon: '💰',
-    label: 'Amount (₹)',
-    desc: 'The billed amount for this specific entry. Highlighted green in the Excel export for quick scanning.',
-    color: 'bg-emerald-50 border-emerald-100',
-  },
-  {
-    icon: '📈',
-    label: 'Running Total (₹)',
-    desc: 'Cumulative billed amount per project up to and including this entry, sorted by date. Resets for each new project.',
-    color: 'bg-violet-50 border-violet-100',
-  },
-  {
-    icon: '🏁',
-    label: 'Milestone',
-    desc: 'The project milestone this billing entry is linked to (optional). Set when logging a billing entry in Financial Settings.',
-    color: 'bg-amber-50 border-amber-100',
-  },
-  {
-    icon: '📝',
-    label: 'Remarks',
-    desc: 'Any additional notes about this billing entry — payment terms, reference numbers, or client communication details.',
-    color: 'bg-rose-50 border-rose-100',
-  },
-]
-
 export default function BillingStatementPage() {
-  const [options,   setOptions]   = useState({ projects: [], billing_types: [] })
-  const [loading,   setLoading]   = useState(true)
-  const [exporting, setExporting] = useState(false)
+  const [options,     setOptions]     = useState({ projects: [], billing_types: [] })
+  const [loading,     setLoading]     = useState(true)
+  const [exporting,   setExporting]   = useState(false)
+  const [rows,        setRows]        = useState([])
+  const [loadingData, setLoadingData] = useState(false)
 
   const [filters, setFilters] = useState({
     project_id:   '',
@@ -66,15 +30,28 @@ export default function BillingStatementPage() {
 
   const setF = (k, v) => setFilters(f => ({ ...f, [k]: v }))
 
-  const load = useCallback(async () => {
-    try {
-      const res = await api.get('/billing-statement-report/filter-options')
-      setOptions(res.data)
-    } catch { /* silent */ }
-    finally { setLoading(false) }
+  useEffect(() => {
+    api.get('/billing-statement-report/filter-options')
+      .then(r => setOptions(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const loadData = useCallback(async (f) => {
+    setLoadingData(true)
+    try {
+      const params = new URLSearchParams()
+      if (f.project_id)   params.set('project_id',   f.project_id)
+      if (f.start_date)   params.set('start_date',   f.start_date)
+      if (f.end_date)     params.set('end_date',     f.end_date)
+      if (f.billing_type) params.set('billing_type', f.billing_type)
+      const r = await api.get(`/billing-statement-report/data?${params}`)
+      setRows(r.data.rows || [])
+    } catch { setRows([]) }
+    finally { setLoadingData(false) }
+  }, [])
+
+  useEffect(() => { loadData(filters) }, [filters, loadData])
 
   const handleExport = async () => {
     setExporting(true)
@@ -84,19 +61,21 @@ export default function BillingStatementPage() {
       if (filters.start_date)   params.set('start_date',   filters.start_date)
       if (filters.end_date)     params.set('end_date',     filters.end_date)
       if (filters.billing_type) params.set('billing_type', filters.billing_type)
-
-      const res = await api.get(`/billing-statement-report/export?${params}`, {
-        responseType: 'blob',
-      })
+      const res = await api.get(`/billing-statement-report/export?${params}`, { responseType: 'blob' })
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
-      a.href = url
-      a.download = 'billing-statement-report.xlsx'
-      a.click()
+      a.href = url; a.download = 'billing-statement-report.xlsx'; a.click()
       URL.revokeObjectURL(url)
     } catch { /* silent */ }
     finally { setExporting(false) }
   }
+
+  // Group rows by project for display
+  const grouped = rows.reduce((acc, r) => {
+    if (!acc[r.project]) acc[r.project] = []
+    acc[r.project].push(r)
+    return acc
+  }, {})
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -114,103 +93,100 @@ export default function BillingStatementPage() {
 
       <div className="max-w-screen-xl mx-auto px-6 py-5 space-y-5">
 
-        {/* Info banner */}
-        <div className="bg-violet-50 border border-violet-100 rounded-2xl px-5 py-3 text-xs text-violet-800 leading-relaxed">
-          <span className="font-semibold">What this report shows:</span>{' '}
-          A complete billing history for each project — every billing entry with its date, type, amount, and a cumulative running total.
-          The Excel export has three sheets — <strong>Summary</strong> (one row per project with totals and types used),{' '}
-          <strong>All Entries</strong> (every individual billing entry with a running total that resets per project), and{' '}
-          <strong>Month-wise Summary</strong> (total billed per calendar month with project breakdown).
-          Billing entries are managed in <strong>Financial Settings → Project Billing History</strong>.
-        </div>
-
-        {/* Filters */}
+        {/* Filters + Export */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filters</div>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filters</div>
+            <button onClick={handleExport} disabled={exporting || loading}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+              {exporting ? <><span className="animate-spin">⟳</span> Generating…</> : <>📥 Export to Excel</>}
+            </button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Project</label>
-              <select className="select text-xs h-8"
-                value={filters.project_id}
-                onChange={e => setF('project_id', e.target.value)}>
+              <select className="select text-xs h-8" value={filters.project_id} onChange={e => setF('project_id', e.target.value)}>
                 <option value="">All Projects</option>
-                {options.projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {options.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Billing Type</label>
-              <select className="select text-xs h-8"
-                value={filters.billing_type}
-                onChange={e => setF('billing_type', e.target.value)}>
+              <select className="select text-xs h-8" value={filters.billing_type} onChange={e => setF('billing_type', e.target.value)}>
                 <option value="">All Types</option>
                 {BILLING_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">Start Date</label>
-              <input type="date" className="input text-xs h-8"
-                value={filters.start_date}
-                onChange={e => {
-                  const v = e.target.value
-                  setF('start_date', v)
-                  if (v && filters.end_date && v > filters.end_date) setF('end_date', '')
-                }} />
+              <input type="date" className="input text-xs h-8" value={filters.start_date}
+                onChange={e => { const v = e.target.value; setF('start_date', v); if (v && filters.end_date && v > filters.end_date) setF('end_date', '') }} />
             </div>
-
             <div>
               <label className="block text-xs text-gray-500 mb-1">End Date</label>
-              <input type="date" className="input text-xs h-8"
-                value={filters.end_date}
-                min={filters.start_date || undefined}
-                onChange={e => {
-                  if (filters.start_date && e.target.value && e.target.value < filters.start_date) return
-                  setF('end_date', e.target.value)
-                }} />
+              <input type="date" className="input text-xs h-8" value={filters.end_date} min={filters.start_date || undefined}
+                onChange={e => { if (filters.start_date && e.target.value && e.target.value < filters.start_date) return; setF('end_date', e.target.value) }} />
             </div>
-
           </div>
         </div>
 
-        {/* KPI explanation cards */}
-        <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Report Columns Explained</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {KPI_CARDS.map(c => (
-              <div key={c.label} className={clsx('rounded-2xl border px-4 py-3', c.color)}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-lg">{c.icon}</span>
-                  <span className="text-xs font-semibold text-gray-800">{c.label}</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">{c.desc}</p>
-              </div>
-            ))}
+        {/* Preview Table */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
+            <div className="text-xs font-semibold text-gray-700">🧾 Preview</div>
+            <div className="text-xs text-gray-400">{loadingData ? 'Loading…' : `${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'} across ${Object.keys(grouped).length} project${Object.keys(grouped).length !== 1 ? 's' : ''}`}</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-violet-50 text-violet-700">
+                  {['Project','Date','Billing Type','Amount (₹)','Running Total (₹)','Milestone','Remarks'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loadingData ? (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 animate-pulse">Loading data…</td></tr>
+                ) : rows.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 italic">No billing entries found for the selected filters.</td></tr>
+                ) : Object.entries(grouped).map(([proj, entries]) => (
+                  <>
+                    {/* Project header row */}
+                    <tr key={`hdr_${proj}`} className="bg-blue-50 border-b border-blue-100">
+                      <td colSpan={7} className="px-3 py-1.5 font-semibold text-blue-800 text-xs">
+                        🏢 {proj}
+                        <span className="ml-3 font-normal text-blue-500">
+                          Total: ₹{fmt(entries.reduce((s, e) => s + (e.amount || 0), 0))} • {entries.length} entries
+                        </span>
+                      </td>
+                    </tr>
+                    {entries.map((r, i) => (
+                      <tr key={`${proj}_${i}`} className={clsx('border-b border-gray-50 hover:bg-violet-50 transition-colors', i % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                        <td className="px-3 py-2 text-gray-400 pl-6">{/* indented, project shown in header */}</td>
+                        <td className="px-3 py-2 text-gray-600">{r.date}</td>
+                        <td className="px-3 py-2">
+                          <span className="bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded text-xs">{r.billing_type}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold text-emerald-700">₹{fmt(r.amount)}</td>
+                        <td className="px-3 py-2 text-right font-medium text-blue-700">₹{fmt(r.running_total)}</td>
+                        <td className="px-3 py-2 text-gray-500">{r.milestone === '—' ? '' : r.milestone}</td>
+                        <td className="px-3 py-2 text-gray-400 max-w-[160px] truncate">{r.remarks === '—' ? '' : r.remarks}</td>
+                      </tr>
+                    ))}
+                  </>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Setup reminder */}
         <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-3 text-xs text-amber-800">
           <span className="font-semibold">Before exporting:</span>{' '}
-          Billing entries must be added per project in <strong>Financial Settings → Project Billing History</strong> (Admin menu).
-          Each entry captures the date, amount, billing type, and optional milestone link.
-          If no billing entries exist yet, both sheets will be empty.
-        </div>
-
-        {/* Export button */}
-        <div className="flex justify-end">
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
-            {exporting
-              ? <><span className="animate-spin">⟳</span> Generating…</>
-              : <>📥 Export to Excel</>}
-          </button>
+          Billing entries must be added per project in <strong>Financial Settings → Project Billing History</strong>.
+          If no entries exist, the preview and export will be empty.
         </div>
 
       </div>
