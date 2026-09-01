@@ -9,6 +9,25 @@ const today = () => new Date().toISOString().split('T')[0]
 const daysAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0] }
 const COLORS_PIE = ['#7c3aed','#10b981','#f59e0b','#94a3b8','#ef4444']
 
+/* ── Session-storage cache (90 s TTL per filter key) ── */
+const CACHE_PFX = 'gd_'
+const CACHE_TTL = 90_000
+
+function cacheKey(filters) {
+  return CACHE_PFX + JSON.stringify(filters)
+}
+function readCache(filters) {
+  try {
+    const raw = sessionStorage.getItem(cacheKey(filters))
+    if (!raw) return null
+    const { data, ts } = JSON.parse(raw)
+    return Date.now() - ts < CACHE_TTL ? data : null
+  } catch { return null }
+}
+function writeCache(filters, data) {
+  try { sessionStorage.setItem(cacheKey(filters), JSON.stringify({ data, ts: Date.now() })) } catch {}
+}
+
 export default function GlobalDashboard() {
   const navigate = useNavigate()
   const [assignments, setAssignments] = useState([])
@@ -18,52 +37,79 @@ export default function GlobalDashboard() {
   const [users, setUsers] = useState([])
   const [projectStatus, setProjectStatus] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)   // background re-fetch indicator
   const [filters, setFilters] = useState({ team:'', project_id:'', employee_id:'', date_from: daysAgo(30), date_to: today() })
 
-  const load = async () => {
-    setLoading(true)
+  const applyData = ({ assignments, workload, projects, users, whSummary, projectStatus }) => {
+    setAssignments(assignments ?? [])
+    setWorkload(workload ?? null)
+    setProjects(projects ?? [])
+    setUsers(users ?? [])
+    setWhSummary(whSummary ?? null)
+    setProjectStatus(projectStatus ?? [])
+  }
+
+  const load = async (currentFilters) => {
+    // 1. Show cached data immediately (zero-latency for revisits)
+    const cached = readCache(currentFilters)
+    if (cached) {
+      applyData(cached)
+      setLoading(false)
+      setRefreshing(true)   // signal a silent background refresh
+    } else {
+      setLoading(true)
+    }
+
     try {
-      // Fix 8: /global/dashboard-summary merges workload + project-status +
-      // projects-list + users-list into one round-trip (was 4 separate calls).
       const wParams = new URLSearchParams()
-      Object.entries(filters).forEach(([k,v]) => v && wParams.append(k, v))
+      Object.entries(currentFilters).forEach(([k,v]) => v && wParams.append(k, v))
 
-      // /global/assignments uses `assigned_to` instead of `employee_id`.
       const aParams = new URLSearchParams()
-      if (filters.project_id) aParams.append('project_id', filters.project_id)
-      if (filters.team) aParams.append('team', filters.team)
-      if (filters.employee_id) aParams.append('assigned_to', filters.employee_id)
-      if (filters.date_from) aParams.append('date_from', filters.date_from)
-      if (filters.date_to) aParams.append('date_to', filters.date_to)
+      if (currentFilters.project_id) aParams.append('project_id', currentFilters.project_id)
+      if (currentFilters.team)       aParams.append('team', currentFilters.team)
+      if (currentFilters.employee_id) aParams.append('assigned_to', currentFilters.employee_id)
+      if (currentFilters.date_from)  aParams.append('date_from', currentFilters.date_from)
+      if (currentFilters.date_to)    aParams.append('date_to', currentFilters.date_to)
 
-      // /work-hours/summary uses `user_id` instead of `employee_id`.
       const whParams = new URLSearchParams()
-      if (filters.project_id) whParams.append('project_id', filters.project_id)
-      if (filters.team) whParams.append('team', filters.team)
-      if (filters.employee_id) whParams.append('user_id', filters.employee_id)
-      if (filters.date_from) whParams.append('date_from', filters.date_from)
-      if (filters.date_to) whParams.append('date_to', filters.date_to)
+      if (currentFilters.project_id) whParams.append('project_id', currentFilters.project_id)
+      if (currentFilters.team)       whParams.append('team', currentFilters.team)
+      if (currentFilters.employee_id) whParams.append('user_id', currentFilters.employee_id)
+      if (currentFilters.date_from)  whParams.append('date_from', currentFilters.date_from)
+      if (currentFilters.date_to)    whParams.append('date_to', currentFilters.date_to)
 
-      // 3 calls instead of 6: assignments + summary bundle + work-hours
-      const [aRes, summaryRes, whRes] = await Promise.all([
-        api.get(`/global/assignments?${aParams}`),
-        api.get(`/global/dashboard-summary?${wParams}`),
-        api.get(`/work-hours/summary?${whParams}`).catch(() => ({ data: null })),
-      ])
+      // Fire all 3 in parallel; render metric cards the instant assignments arrive
+      const assignmentsPromise = api.get(`/global/assignments?${aParams}`)
+      const summaryPromise     = api.get(`/global/dashboard-summary?${wParams}`)
+      const whPromise          = api.get(`/work-hours/summary?${whParams}`).catch(() => ({ data: null }))
+
+      // assignments drives the metric cards — show them as soon as possible
+      const aRes = await assignmentsPromise
       setAssignments(aRes.data)
-      setWorkload(summaryRes.data.workload)
-      setProjects(summaryRes.data.projects || [])
-      setUsers(summaryRes.data.users || [])
-      setWhSummary(whRes.data)
-      setProjectStatus(summaryRes.data.project_status || [])
-    } catch(e) { console.error(e) }
-    finally { setLoading(false) }
+      setLoading(false)   // metric cards + pie can render now
+
+      // summary + work-hours come in parallel; apply when both ready
+      const [summaryRes, whRes] = await Promise.all([summaryPromise, whPromise])
+      const fresh = {
+        assignments: aRes.data,
+        workload:       summaryRes.data.workload,
+        projects:       summaryRes.data.projects       || [],
+        users:          summaryRes.data.users           || [],
+        whSummary:      whRes.data,
+        projectStatus:  summaryRes.data.project_status || [],
+      }
+      applyData(fresh)
+      writeCache(currentFilters, fresh)
+    } catch(e) { console.error(e); setLoading(false) }
+    finally { setRefreshing(false) }
   }
 
   const _loadTimer = useRef(null)
   useEffect(() => {
     clearTimeout(_loadTimer.current)
-    _loadTimer.current = setTimeout(load, 300)
+    // No debounce on the very first render; 300 ms for subsequent filter changes
+    const delay = loading ? 0 : 300
+    _loadTimer.current = setTimeout(() => load(filters), delay)
     return () => clearTimeout(_loadTimer.current)
   }, [filters])
   const setFilter = (k, v) => {
@@ -117,6 +163,11 @@ export default function GlobalDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {refreshing && (
+              <span className="text-xs text-violet-400 flex items-center gap-1 animate-pulse mr-1">
+                <span className="animate-spin">⟳</span> Refreshing…
+              </span>
+            )}
             <QuickRange label="7 days" from={daysAgo(7)} to={today()} />
             <QuickRange label="30 days" from={daysAgo(30)} to={today()} />
             <QuickRange label="90 days" from={daysAgo(90)} to={today()} />
@@ -186,10 +237,18 @@ export default function GlobalDashboard() {
         </div>
 
         {loading ? (
-          <div className="text-center py-16 text-violet-400 animate-pulse">
-            <div className="text-4xl mb-3 animate-spin-slow">⚙️</div>
-            <div className="text-sm">Loading dashboard...</div>
-          </div>
+          /* First visit with no cache — show skeleton cards + spinner */
+          <>
+            <div className="grid grid-cols-7 gap-3 mb-5">
+              {Array(7).fill(0).map((_,i) => (
+                <div key={i} className="bg-gray-100 rounded-2xl p-3 h-20 animate-pulse" />
+              ))}
+            </div>
+            <div className="text-center py-12 text-violet-400 animate-pulse">
+              <div className="text-3xl mb-2 animate-spin-slow">⚙️</div>
+              <div className="text-sm">Loading dashboard…</div>
+            </div>
+          </>
         ) : (
           <>
             {/* Charts row */}

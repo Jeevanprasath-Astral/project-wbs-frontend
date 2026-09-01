@@ -28,6 +28,27 @@ const PERMISSIONS = {
   'Client':                ['View dashboard','View reports','Milestone sign-off'],
 }
 
+const ACTION_LABELS = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete' }
+
+// Build a human-readable permissions list from the live backend matrix.
+// Falls back to the static PERMISSIONS object if the role isn't in the matrix.
+function buildRolePerms(role, matrix, modules) {
+  if (role === 'Admin') return ['Full system access — all modules, all actions']
+  if (matrix && modules.length > 0) {
+    // Only use live data if this role is actually known to the matrix
+    if (Object.prototype.hasOwnProperty.call(matrix, role)) {
+      const list = []
+      for (const mod of modules) {
+        const cell = matrix[role]?.[mod.key] || {}
+        const actions = ['view','create','edit','delete'].filter(a => cell[a])
+        if (actions.length) list.push(`${mod.label}: ${actions.map(a => ACTION_LABELS[a]).join(', ')}`)
+      }
+      return list
+    }
+  }
+  return PERMISSIONS[role] || []
+}
+
 /* ── Role Access Panel ─────────────────────────────────────────────────────── */
 const PERM_ACTIONS = [
   { key: 'view',   label: 'V', title: 'View',   color: 'text-blue-600',  bg: 'bg-blue-600'  },
@@ -40,7 +61,7 @@ const DISPLAY_ROLES = [
   'Associate Data Analyst','Associate','Functional Consultant','Technical Team','Client',
 ]
 
-function RoleAccessPanel({ currentUser }) {
+function RoleAccessPanel({ currentUser, onPermissionChange }) {
   const [matrix, setMatrix]     = useState(null)
   const [modules, setModules]   = useState([])
   const [saving, setSaving]     = useState({})
@@ -69,6 +90,7 @@ function RoleAccessPanel({ currentUser }) {
     try {
       await api.put(`/role-permissions/${encodeURIComponent(role)}/${moduleKey}`, { [`can_${action}`]: newVal })
       showMsg(`✓ Saved`)
+      onPermissionChange?.()   // refresh parent's matrix so user-card counts update
     } catch {
       // Rollback
       setMatrix(m => ({ ...m, [role]: { ...m[role], [moduleKey]: { ...m[role][moduleKey], [action]: !newVal } } }))
@@ -85,6 +107,7 @@ function RoleAccessPanel({ currentUser }) {
       const r = await api.get('/role-permissions')
       setMatrix(r.data.matrix)
       showMsg(`"${role}" reset to defaults`)
+      onPermissionChange?.()   // refresh parent's matrix so user-card counts update
     } catch { showMsg('Reset failed', 'error') }
   }
 
@@ -223,6 +246,8 @@ export default function GlobalTeam() {
   const [removeConfirming, setRemoveConfirming] = useState(false)
   const [confirmState, setConfirmState] = useState(null)   // { title, message, onConfirm }
   const [activeTab, setActiveTab] = useState('team')
+  const [roleMatrix, setRoleMatrix]     = useState(null)
+  const [roleModules, setRoleModules]   = useState([])
 
   // Combined role list: built-in ALL_ROLES + any custom roles from DB
   const allRoles = [...ROLES, ...customRoles.map(r => r.name).filter(n => !ROLES.includes(n))]
@@ -232,6 +257,14 @@ export default function GlobalTeam() {
       const r = await api.get('/global/custom-roles')
       setCustomRoles(r.data)
     } catch(e) { console.error(e) }
+  }
+
+  const loadRolePerms = async () => {
+    try {
+      const r = await api.get('/role-permissions')
+      setRoleModules(r.data.modules)
+      setRoleMatrix(r.data.matrix)
+    } catch(e) { console.error('role-permissions fetch:', e) }
   }
 
   const load = async () => {
@@ -277,6 +310,7 @@ export default function GlobalTeam() {
     return () => clearTimeout(_loadTimer.current)
   }, [filterRole, filterStatus, filterTeam, filterProject])
   useEffect(() => { loadCustomRoles() }, [])
+  useEffect(() => { loadRolePerms() }, [])
 
   const showMsg = (text, type='success') => { setMsg({text,type}); setTimeout(()=>setMsg(null),3000) }
 
@@ -462,7 +496,9 @@ export default function GlobalTeam() {
         </div>
 
         {/* ── Role Access Panel ── */}
-        {activeTab === 'access' && <RoleAccessPanel currentUser={currentUser} />}
+        {activeTab === 'access' && (
+          <RoleAccessPanel currentUser={currentUser} onPermissionChange={loadRolePerms} />
+        )}
 
         {activeTab !== 'access' && (<>
 
@@ -609,20 +645,28 @@ export default function GlobalTeam() {
                     ))}
                   </div>
 
-                  {/* Permissions preview */}
-                  <button onClick={() => setShowPerms(showPerms === u.id ? null : u.id)}
-                    className="w-full text-left text-xs text-violet-600 hover:text-violet-800 mb-2 font-medium">
-                    {showPerms === u.id ? '▲ Hide' : '▼ View'} permissions ({PERMISSIONS[u.role]?.length || 0})
-                  </button>
-                  {showPerms === u.id && (
-                    <div className="bg-violet-50 rounded-xl p-2.5 mb-3">
-                      {PERMISSIONS[u.role]?.map(p => (
-                        <div key={p} className="text-xs text-violet-700 flex items-center gap-1.5 mb-1">
-                          <span className="text-violet-400">✓</span> {p}
+                  {/* Permissions preview — built from live backend matrix */}
+                  {(() => {
+                    const perms = buildRolePerms(u.role, roleMatrix, roleModules)
+                    return (<>
+                      <button onClick={() => setShowPerms(showPerms === u.id ? null : u.id)}
+                        className="w-full text-left text-xs text-violet-600 hover:text-violet-800 mb-2 font-medium">
+                        {showPerms === u.id ? '▲ Hide' : '▼ View'} permissions ({perms.length})
+                      </button>
+                      {showPerms === u.id && (
+                        <div className="bg-violet-50 rounded-xl p-2.5 mb-3">
+                          {perms.length === 0
+                            ? <div className="text-xs text-gray-400 italic">No permissions configured for this role.</div>
+                            : perms.map(p => (
+                              <div key={p} className="text-xs text-violet-700 flex items-center gap-1.5 mb-1">
+                                <span className="text-violet-400">✓</span> {p}
+                              </div>
+                            ))
+                          }
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )}
+                    </>)
+                  })()}
 
                   {/* Actions */}
                   {isAdmin && (
