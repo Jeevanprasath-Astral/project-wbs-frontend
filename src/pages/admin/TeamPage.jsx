@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import clsx from 'clsx'
 import { useAppStore } from '../../store'
-import { ALL_ROLES, isTeamManager } from '../../utils/permissions'
+import { ALL_ROLES, isTeamManager, canAccess } from '../../utils/permissions'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import { withPageCache, invalidatePage } from '../../utils/pageDataStore'
 import { GenericPageSkeleton } from '../../components/common/SkeletonLoader'
@@ -36,7 +36,8 @@ function Avatar({ name, size = 'md' }) {
 export default function TeamPage() {
   const { id } = useParams()
   const currentUser = useAppStore(s => s.user)
-  const canManage = isTeamManager(currentUser) || currentUser?.role === 'FC Lead'
+  // DB-driven: view=sidebar visible, create=add member, delete=remove member
+  const canManage = canAccess(currentUser, 'project_team', 'create') || isTeamManager(currentUser)
   const [team, setTeam] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [loading, setLoading] = useState(true)

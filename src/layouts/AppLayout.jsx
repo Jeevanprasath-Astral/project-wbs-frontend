@@ -1,7 +1,7 @@
 import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useCallback } from 'react'
 import { useAppStore } from '../store'
-import { isTeamManager } from '../utils/permissions'
+import { isTeamManager, canAccess } from '../utils/permissions'
 import api from '../utils/api'
 import clsx from 'clsx'
 import { preloadPage } from '../utils/pageDataStore'
@@ -167,7 +167,7 @@ export default function AppLayout() {
         {/* Main nav */}
         <nav className="flex-1 py-3 px-2">
           <div className="text-xs text-slate-600 px-2 pt-1 pb-2 uppercase tracking-wider font-medium">Main</div>
-          {NAV.filter(n => (!n.adminOnly || user?.role === 'Admin') && (!n.teamManagerOnly || isTeamManager(user))).map((n) => {
+          {NAV.filter(n => (!n.adminOnly || user?.role === 'Admin') && (!n.teamManagerOnly || canAccess(user, 'project_team', 'view') || isTeamManager(user))).map((n) => {
             const active = isActive(n.path)
             return (
               <button key={n.path}
