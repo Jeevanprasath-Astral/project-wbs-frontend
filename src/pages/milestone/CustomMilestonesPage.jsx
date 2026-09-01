@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../utils/api'
+import { invalidatePage } from '../../utils/pageDataStore'
 import AttachmentPanel from '../../components/AttachmentPanel'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import { useAppStore } from '../../store'
@@ -1021,7 +1022,11 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen, isD
   // Planned Start/End, Actual Start/End (+ time-of-day, total days, rollup hrs).
   const saveMsTimeline = async () => {
     await api.patch(`/projects/${projectId}/custom-milestones/${ms.id}`, draft)
+    // Invalidate the project dashboard cache so status/progress changes
+    // are reflected immediately when the user navigates to Dashboard.
+    invalidatePage(`page:${projectId}:dashboard`)
     setShowTimeline(false)
+    onUpdate()
   }
   const openTplTasks = async () => {
     setShowTplTasks(true)

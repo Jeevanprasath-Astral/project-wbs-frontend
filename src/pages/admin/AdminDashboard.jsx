@@ -282,38 +282,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Bottom row */}
-      <div className={clsx('grid gap-4', whSummary ? 'grid-cols-4' : 'grid-cols-3')}>
-
-        {/* Workload */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">👥</span>
-            <span className="text-sm font-semibold text-gray-800">Team Workload</span>
-          </div>
-          <div className="space-y-2.5">
-            {(workload || []).map((w, i) => (
-              <div key={w.user_id} className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                     style={{ background: `hsl(${i * 60 + 240}, 70%, 55%)` }}>
-                  {w.name?.slice(0,2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-gray-700 truncate">{w.name}</div>
-                  <div className="text-xs text-gray-400 truncate">{w.role}</div>
-                </div>
-                <span className="text-xs font-medium text-violet-600 w-14 text-right" title="Milestone-based tasks">
-                  🏁 {w.milestone_tasks?.total ?? 0}
-                </span>
-                <span className="text-xs font-medium text-amber-600 w-12 text-right" title="General tasks">
-                  ⭐ {w.general_tasks?.total ?? 0}
-                </span>
-              </div>
-            ))}
-            {(!workload || workload.length === 0) && (
-              <div className="text-center py-3 text-gray-400 text-xs">No team members yet</div>
-            )}
-          </div>
-        </div>
+      <div className={clsx('grid gap-4', whSummary ? 'grid-cols-3' : 'grid-cols-2')}>
 
         {/* Deadlines */}
         <div className="card">

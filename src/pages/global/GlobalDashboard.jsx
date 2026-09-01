@@ -80,8 +80,10 @@ export default function GlobalDashboard() {
   const completed      = assignments.filter(a => a.status === 'Completed').length
   const overdue        = assignments.filter(a => a.is_overdue).length
   const completedOnTime= assignments.filter(a => a.status === 'Completed' && a.due_date && new Date(a.completed_at) <= new Date(a.due_date)).length
-  const activeProjects = new Set(assignments.map(a => a.project_id)).size
-  const activeMembers  = new Set(assignments.map(a => a.assigned_to)).size
+  // Active Projects = projects with status "In Progress" (not date-filtered)
+  const activeProjects = projects.filter(p => p.status === 'In Progress').length
+  // Active Members = distinct assignees who have at least one In Progress assignment
+  const activeMembers  = new Set(assignments.filter(a => a.status === 'In Progress').map(a => a.assigned_to)).size
 
   const pieData = [
     { name: 'Completed', value: completed },
