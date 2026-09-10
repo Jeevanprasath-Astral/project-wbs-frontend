@@ -130,6 +130,18 @@ function PreviewTable({ columns, rows, loading }) {
                       </td>
                     )
                   }
+                  if (c.key === 'difference') {
+                    const isPos = typeof val === 'number' && val >= 0
+                    const isNeg = typeof val === 'number' && val < 0
+                    return (
+                      <td key={c.key} className={clsx(
+                        'px-3 py-2 font-mono text-right font-semibold rounded',
+                        isPos ? 'text-emerald-700 bg-emerald-50' : isNeg ? 'text-rose-600 bg-rose-50' : 'text-gray-400'
+                      )}>
+                        {typeof val === 'number' ? (val >= 0 ? `+${val}` : val) : '—'}
+                      </td>
+                    )
+                  }
                   if (c.key === 'schedule_variance_reason') {
                     return (
                       <td key={c.key} className="px-3 py-2 text-gray-500 max-w-xs truncate" title={val || ''}>
@@ -245,7 +257,7 @@ export default function ProjectReportsPage() {
   // ── Report 1: Budgeted vs Actual Hours ────────────────────────────────────
   const [bFilter, setBFilter] = useState({
     assignee: '', project_id: '', team: '', status: '',
-    start_date: monthStart(), end_date: today(),
+    start_date: '', end_date: '',
   })
   const [bRows, setBRows]       = useState([])
   const [bLoading, setBLoading] = useState(false)
@@ -274,13 +286,14 @@ export default function ProjectReportsPage() {
     { key: 'end_date',        label: 'End Date' },
     { key: 'budgeted_hours',  label: 'Budgeted Hrs' },
     { key: 'actual_hours',    label: 'Actual Hrs' },
+    { key: 'difference',      label: 'Difference' },
     { key: 'status',          label: 'Status' },
   ]
 
   // ── Report 2: Timeline ────────────────────────────────────────────────────
   const [tFilter, setTFilter] = useState({
     project_id: '', status: '',
-    start_date: monthStart(), end_date: today(),
+    start_date: '', end_date: '',
   })
   const [tRows, setTRows]       = useState([])
   const [tLoading, setTLoading] = useState(false)

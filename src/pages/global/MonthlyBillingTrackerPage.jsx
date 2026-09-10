@@ -20,7 +20,7 @@ export default function MonthlyBillingTrackerPage() {
 
   const [projects, setProjects]   = useState([])
   const [filter, setFilter]       = useState({
-    project_id: '', billing_type: '', start_date: monthStart(), end_date: today(),
+    project_id: '', billing_type: '', start_date: '', end_date: '',
   })
   const [data, setData]           = useState(null)
   const [loading, setLoading]     = useState(false)
