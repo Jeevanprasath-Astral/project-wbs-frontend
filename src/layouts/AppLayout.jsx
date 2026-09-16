@@ -6,6 +6,7 @@ import api from '../utils/api'
 import clsx from 'clsx'
 import { preloadPage } from '../utils/pageDataStore'
 import { getProjectTeam, getProjectCustomMilestones, getAssignmentCategories, getUsersList } from '../utils/masterData'
+import DemoBanner from '../components/DemoBanner'
 
 const NAV = [
   { icon: '🏁', emoji: true, label: 'Milestone Config', path: 'configure-milestones' },
@@ -23,7 +24,7 @@ export default function AppLayout() {
   const { id } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, activeProject, unreadCount, setUnreadCount, logout, patchUser } = useAppStore()
+  const { user, activeProject, setActiveProject, unreadCount, setUnreadCount, logout, patchUser } = useAppStore()
 
   // Refresh role permissions on mount so users who return via persisted token
   // always have the latest permission matrix (Admin changes take effect immediately).
@@ -33,6 +34,23 @@ export default function AppLayout() {
       .then(r => patchUser(r.data))
       .catch(() => {})
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh the active project's live progress whenever we enter a project.
+  // GET /projects/{id}/milestone-progress is a lightweight 2-query endpoint
+  // that computes live % from CustomMilestone+CustomTask without the heavy
+  // joins that the full configure-milestones endpoint requires.
+  useEffect(() => {
+    if (!id) return
+    api.get(`/projects/${id}/milestone-progress`)
+      .then(r => {
+        const pct = r.data?.project_pct ?? 0
+        // Read the latest activeProject snapshot from the store so we don't
+        // close over a stale reference from when the effect was created.
+        const current = useAppStore.getState().activeProject
+        if (current) setActiveProject({ ...current, progress: pct })
+      })
+      .catch(() => {})
+  }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll unread notification count every 60 s so the badge stays live
   useEffect(() => {
@@ -130,8 +148,12 @@ export default function AppLayout() {
     }
   }, [id])
 
+  const isDemoMode = useAppStore((s) => s.isDemoMode)
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* Demo banner — fixed at top, collapses nothing, adds 32px padding offset */}
+      <DemoBanner />
 
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <aside className="w-56 flex-shrink-0 flex flex-col overflow-y-auto sidebar-dark">
@@ -206,7 +228,7 @@ export default function AppLayout() {
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden${isDemoMode ? ' pt-8' : ''}`}>
 
         {/* Topbar */}
         <header className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0 shadow-sm">

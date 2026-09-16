@@ -1044,6 +1044,77 @@ export default function ProposalEstimateDetailPage() {
               </p>
             )}
           </div>
+
+          {/* Client Contact Details */}
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 col-span-2">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-4">👤 Client Contact Details</p>
+            {editable ? (
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: 'contact_name',        label: 'Contact Person Name', placeholder: '', type: 'text' },
+                  { key: 'contact_designation', label: 'Designation / Title', placeholder: '', type: 'text' },
+                  { key: 'contact_email',       label: 'Email',               placeholder: '', type: 'email' },
+                  { key: 'contact_phone',       label: 'Phone / WhatsApp',    placeholder: '', type: 'text' },
+                ].map(({ key, label, placeholder, type }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+                    <input
+                      type={type}
+                      defaultValue={proposal[key] ?? ''}
+                      placeholder={placeholder}
+                      onBlur={async e => {
+                        const val = e.target.value.trim() || null
+                        if (val === (proposal[key] || null)) return
+                        try {
+                          const { data } = await api.patch(`/proposal-estimates/${proposal.id}`, { [key]: val })
+                          setProposal(data)
+                        } catch {}
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </div>
+                ))}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                  <textarea
+                    defaultValue={proposal.contact_notes ?? ''}
+                    placeholder=""
+                    rows={2}
+                    onBlur={async e => {
+                      const val = e.target.value.trim() || null
+                      if (val === (proposal.contact_notes || null)) return
+                      try {
+                        const { data } = await api.patch(`/proposal-estimates/${proposal.id}`, { contact_notes: val })
+                        setProposal(data)
+                      } catch {}
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+                <p className="col-span-2 text-xs text-gray-400">Each field auto-saves on blur.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-y-3 gap-x-6">
+                {[
+                  { label: 'Contact Person', value: proposal.contact_name },
+                  { label: 'Designation',    value: proposal.contact_designation },
+                  { label: 'Email',          value: proposal.contact_email },
+                  { label: 'Phone',          value: proposal.contact_phone },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <p className="text-xs text-gray-400 font-medium mb-0.5">{label}</p>
+                    <p className="text-sm text-gray-800">{value || <span className="text-gray-400 italic">—</span>}</p>
+                  </div>
+                ))}
+                {proposal.contact_notes && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-400 font-medium mb-0.5">Notes</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{proposal.contact_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

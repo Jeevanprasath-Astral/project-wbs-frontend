@@ -78,20 +78,15 @@ export default function GlobalDashboard() {
       if (currentFilters.date_from)  whParams.append('date_from', currentFilters.date_from)
       if (currentFilters.date_to)    whParams.append('date_to', currentFilters.date_to)
 
-      // Fire all 3 in parallel; render metric cards the instant assignments arrive
-      const assignmentsPromise = api.get(`/global/assignments?${aParams}`)
-      const summaryPromise     = api.get(`/global/dashboard-summary?${wParams}`)
-      const whPromise          = api.get(`/work-hours/summary?${whParams}`).catch(() => ({ data: null }))
-
-      // assignments drives the metric cards — show them as soon as possible
-      const aRes = await assignmentsPromise
-      setAssignments(aRes.data)
-      setLoading(false)   // metric cards + pie can render now
-
-      // summary + work-hours come in parallel; apply when both ready
-      const [summaryRes, whRes] = await Promise.all([summaryPromise, whPromise])
+      // Fire all 3 in parallel and wait for ALL before rendering —
+      // ensures every section appears at the same time (no partial loads).
+      const [aRes, summaryRes, whRes] = await Promise.all([
+        api.get(`/global/assignments?${aParams}`),
+        api.get(`/global/dashboard-summary?${wParams}`),
+        api.get(`/work-hours/summary?${whParams}`).catch(() => ({ data: null })),
+      ])
       const fresh = {
-        assignments: aRes.data,
+        assignments:    aRes.data,
         workload:       summaryRes.data.workload,
         projects:       summaryRes.data.projects       || [],
         users:          summaryRes.data.users           || [],
@@ -100,6 +95,7 @@ export default function GlobalDashboard() {
       }
       applyData(fresh)
       writeCache(currentFilters, fresh)
+      setLoading(false)   // reveal everything at once
     } catch(e) { console.error(e); setLoading(false) }
     finally { setRefreshing(false) }
   }

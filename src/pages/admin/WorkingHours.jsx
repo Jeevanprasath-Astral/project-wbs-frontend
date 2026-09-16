@@ -72,7 +72,7 @@ export default function WorkingHours() {
           getProjectCustomMilestones(projectId),
         ])
         return {
-          records: rRes.data, summary: sRes.data, users: usersData,
+          records: rRes.data?.records || [], summary: sRes.data, users: usersData,
           assignments: aRes.data.filter(a => a.status !== 'Completed'),
           milestones: msData,
         }
@@ -196,13 +196,11 @@ export default function WorkingHours() {
 
       {/* Overall summary */}
       {summary && (
-        <div className="grid grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-4">
           {[
             {icon:'⏱️', label:'Total Time Taken', value:fmtHours(summary.total_hours), color:'from-violet-100 to-purple-100'},
-            {icon:'📋', label:'Assigned Hours', value:fmtHours(summary.total_assigned), color:'from-blue-100 to-indigo-100'},
             {icon:'⏳', label:'Buffer Time', value:fmtHours(summary.total_buffer_hours), color:'from-rose-100 to-pink-100'},
             {icon:'✅', label:'Actual Working Hours', value:fmtHours(summary.total_actual_working_hours), color:'from-cyan-100 to-sky-100'},
-            {icon:'📊', label:'Utilization', value:`${summary.utilization}%`, color:'from-emerald-100 to-teal-100'},
           ].map(s => (
             <div key={s.label} className={`bg-gradient-to-br ${s.color} rounded-2xl p-4 border border-white shadow-sm`}>
               <div className="text-xl mb-1">{s.icon}</div>

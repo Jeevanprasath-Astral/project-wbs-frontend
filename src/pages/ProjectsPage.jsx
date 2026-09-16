@@ -40,6 +40,10 @@ export default function ProjectsPage() {
   const [error, setError] = useState(false)
   const [msg, setMsg] = useState(null)
 
+  // Collapsible category sections — Billable open by default
+  const [openSections, setOpenSections] = useState({ 'Billable': true })
+  const toggleSection = key => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
+
   // Edit modal state
   const [editProject, setEditProject] = useState(null)
   const [editForm, setEditForm] = useState({})
@@ -54,7 +58,26 @@ export default function ProjectsPage() {
   const load = (isRetry = false) => {
     if (!isRetry) setLoading(true)
     return api.get('/projects')
-      .then(r => { setProjects(r.data); setError(false); return true })
+      .then(async r => {
+        const projects = r.data
+        // Enrich with live milestone-based progress — the stored Project.progress
+        // is never updated by the CustomMilestone workflow, so we call the
+        // dedicated 2-query progress-batch endpoint to get accurate values.
+        try {
+          const progRes = await api.get('/projects/progress-batch')
+          const progMap = Object.fromEntries(progRes.data.map(p => [p.id, p.progress]))
+          const enriched = projects.map(p => ({
+            ...p,
+            progress: progMap[p.id] ?? p.progress ?? 0,
+          }))
+          setProjects(enriched)
+        } catch {
+          // Fallback: use the projects as-is (progress may be stale but page still loads)
+          setProjects(projects)
+        }
+        setError(false)
+        return true
+      })
       .catch(() => { setError(true); return false })
       .finally(() => setLoading(false))
   }
@@ -243,17 +266,23 @@ export default function ProjectsPage() {
           })
           const activeSections = CATEGORY_SECTIONS.filter(s => grouped[s.key]?.length > 0)
           return (
-            <div className="space-y-6">
-              {activeSections.map(section => (
+            <div className="space-y-4">
+              {activeSections.map(section => {
+                const isOpen = !!openSections[section.key]
+                return (
                 <div key={section.key}>
-                  {/* Section header */}
-                  <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border mb-3 ${section.banner}`}>
+                  {/* Clickable section header — toggles project list */}
+                  <div
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer select-none transition-all ${section.banner} ${isOpen ? 'mb-3' : 'mb-0'}`}
+                    onClick={() => toggleSection(section.key)}
+                  >
                     <span className="text-base">{section.icon}</span>
                     <span className="text-sm font-semibold">{section.label}</span>
-                    <span className="ml-auto text-xs font-normal opacity-60">{grouped[section.key].length} project{grouped[section.key].length !== 1 ? 's' : ''}</span>
+                    <span className="ml-auto text-xs font-normal opacity-60 mr-2">{grouped[section.key].length} project{grouped[section.key].length !== 1 ? 's' : ''}</span>
+                    <span className={clsx('text-current opacity-50 text-xs transition-transform duration-200', isOpen && 'rotate-90')}>▶</span>
                   </div>
-                  {/* Project cards */}
-                  <div className="grid grid-cols-1 gap-3 stagger">
+                  {/* Project cards — visible only when section is open */}
+                  {isOpen && <div className="grid grid-cols-1 gap-3 stagger">
                     {grouped[section.key].map(p => {
                       const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG['Not Started']
                       const color = PROJ_COLORS[p._idx % PROJ_COLORS.length]
@@ -337,9 +366,9 @@ export default function ProjectsPage() {
                         </div>
                       )
                     })}
-                  </div>
+                  </div>}
                 </div>
-              ))}
+                )})}
             </div>
           )
         })()}

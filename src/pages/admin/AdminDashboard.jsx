@@ -5,6 +5,7 @@ import { DashboardSkeleton } from '../../components/common/SkeletonLoader'
 import api from '../../utils/api'
 import clsx from 'clsx'
 import { withPageCache } from '../../utils/pageDataStore'
+import { useAppStore } from '../../store'
 
 const MS_ICONS = ['🚀','🤝','🔍','📝','⚙️','🧪','📦','✅','🌟','🛡️']
 
@@ -41,31 +42,72 @@ const MetricCard = ({ icon, label, value, sub, gradient, delay = 0 }) => (
 export default function AdminDashboard() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const setActiveProject = useAppStore(s => s.setActiveProject)
+  const activeProject    = useAppStore(s => s.activeProject)
   const [data, setData] = useState(null)
   const [whSummary, setWhSummary] = useState(null)
+  const [assignmentSummary, setAssignmentSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     setError(null)
+    setAssignmentSummary(null)
+
+    // ── Phase 2: supplementary data (non-blocking) ─────────────────────────
+    // Starts immediately in parallel — fills in the assignment strip and
+    // work-hours card as soon as each resolves, without blocking the render.
+    api.get(`/projects/${id}/assignments/summary`)
+      .then(r => setAssignmentSummary(r.data))
+      .catch(() => setAssignmentSummary(null))
+
+    api.get(`/work-hours/summary?project_id=${id}`)
+      .then(r => setWhSummary(r.data))
+      .catch(() => setWhSummary(null))
+
+    // ── Phase 1: core dashboard (cached — instant on repeat visits) ────────
+    // Cache TTL handles staleness — no invalidatePage on every mount so
+    // revisiting the dashboard tab is instant from the in-memory cache.
     withPageCache(
       `page:${id}:dashboard`,
       async () => {
-        const [dashRes, assignRes, whRes] = await Promise.all([
+        const [dashRes, msProgRes] = await Promise.all([
           api.get(`/projects/${id}/dashboard`),
-          api.get(`/projects/${id}/assignments/summary`).catch(() => ({ data: null })),
-          api.get(`/work-hours/summary?project_id=${id}`).catch(() => ({ data: null })),
+          // Lightweight: 2 queries — computes live % from CustomMilestone+CustomTask
+          api.get(`/projects/${id}/milestone-progress`).catch(() => ({ data: null })),
         ])
-        return { data: { ...dashRes.data, assignmentSummary: assignRes.data }, whSummary: whRes.data }
+        const dashData = dashRes.data
+
+        // Merge live milestone progress % (overrides stale ProjectMilestone values)
+        if (msProgRes.data?.milestones) {
+          const pctMap = Object.fromEntries(
+            msProgRes.data.milestones.map(m => [m.num, m.pct])
+          )
+          dashData.milestones = (dashData.milestones || []).map(ms => ({
+            ...ms,
+            progress: pctMap[ms.num] ?? ms.progress ?? 0,
+          }))
+          if (dashData.summary) {
+            dashData.summary.progress = msProgRes.data.project_pct ?? dashData.summary.progress
+          }
+        }
+
+        return { data: dashData }
       },
-      ({ data, whSummary }) => { setData(data); setWhSummary(whSummary) },
+      ({ data }) => {
+        setData(data)
+        // Keep the sidebar progress in sync
+        if (data?.summary?.progress != null && activeProject) {
+          setActiveProject({ ...activeProject, progress: data.summary.progress })
+        }
+      },
       setLoading,
     ).catch(err => {
       console.error('Dashboard error:', err)
       setError(err.response?.data?.detail || 'Failed to load dashboard')
       setLoading(false)
     })
-  }, [id])
+  }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading && !data) return <DashboardSkeleton />
   if (error) return (
@@ -103,7 +145,18 @@ export default function AdminDashboard() {
           </h1>
           <p className="text-xs text-gray-400 mt-0.5">Live project overview & tracking</p>
         </div>
-        <button onClick={() => navigate(`/projects/${id}/export`)}
+        <button
+          onClick={async () => {
+            try {
+              const res = await api.get(`/projects/${id}/export/dashboard-xlsx`, { responseType: 'blob' })
+              const url = URL.createObjectURL(res.data)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `dashboard-${id}.xlsx`
+              a.click()
+              URL.revokeObjectURL(url)
+            } catch (e) { console.error('Dashboard export error:', e) }
+          }}
           className="btn btn-primary text-xs">
           ⬇️ Export report
         </button>
@@ -119,7 +172,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Assignment summary strip */}
-      {data.assignmentSummary && (
+      {assignmentSummary && (
         <div className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-4 flex items-center gap-4 flex-wrap animate-fade-up">
           <div className="flex items-center gap-2 text-white">
             <span className="text-xl">📌</span>
@@ -127,10 +180,10 @@ export default function AdminDashboard() {
           </div>
           <div className="flex gap-3 flex-wrap">
             {[
-              { label:'Total', value: data.assignmentSummary.total, bg:'bg-white/20' },
-              { label:'In Progress', value: data.assignmentSummary.in_progress, bg:'bg-amber-400/30' },
-              { label:'Completed', value: data.assignmentSummary.completed, bg:'bg-emerald-400/30' },
-              { label:'Overdue', value: data.assignmentSummary.overdue, bg:'bg-rose-400/30' },
+              { label:'Total', value: assignmentSummary.total, bg:'bg-white/20' },
+              { label:'In Progress', value: assignmentSummary.in_progress, bg:'bg-amber-400/30' },
+              { label:'Completed', value: assignmentSummary.completed, bg:'bg-emerald-400/30' },
+              { label:'Overdue', value: assignmentSummary.overdue, bg:'bg-rose-400/30' },
             ].map(s => (
               <div key={s.label} className={`${s.bg} rounded-xl px-3 py-1.5 text-center`}>
                 <div className="text-white font-bold text-sm">{s.value}</div>

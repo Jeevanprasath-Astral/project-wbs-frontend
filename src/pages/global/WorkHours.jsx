@@ -15,6 +15,11 @@ export default function WorkHours() {
   const navigate = useNavigate()
   const currentUser = useAppStore(s => s.user)
   const [records, setRecords] = useState([])
+  const [recordsTotal, setRecordsTotal] = useState(0)
+  const [recordsOffset, setRecordsOffset] = useState(0)
+  const RECORDS_LIMIT = 50
+  const [showRecords, setShowRecords] = useState(false)
+  const [recordsLoading, setRecordsLoading] = useState(false)
   const [summary, setSummary] = useState(null)
   const [projects, setProjects] = useState([])
   const [users, setUsers] = useState([])
@@ -23,7 +28,6 @@ export default function WorkHours() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
   const [confirmState, setConfirmState] = useState(null)
-  const [activeAssignments, setActiveAssignments] = useState([])
   const [teams, setTeams] = useState([])
   const [period, setPeriod] = useState('daily')
   const [filters, setFilters] = useState({ project_id:'', user_id:'', team:'', team_id:'', milestone_num:'', date_from: daysAgo(30), date_to: today() })
@@ -31,29 +35,71 @@ export default function WorkHours() {
     custom_milestone_id:'', custom_task_id:'', custom_subtask_id:'', activity_id:'' })
   const [cmMilestones, setCmMilestones] = useState([])
 
+  const buildParams = () => {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([k,v]) => v && params.append(k, v))
+    return params
+  }
+
   const load = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      Object.entries(filters).forEach(([k,v]) => v && params.append(k, v))
+      const params = buildParams()
       const sParams = new URLSearchParams(params)
       sParams.append('period', period)
-      const [rRes, sRes, projectsData, usersData, aRes, teamsData] = await Promise.all([
-        api.get(`/work-hours?${params}`),
+      // Removed /global/assignments — was fetching all assignments just for the
+      // Milestone dropdown, costing 4 extra DB queries on every page load.
+      // Milestone filter is now a plain number input (no dropdown needed).
+      const [sRes, projectsData, usersData, teamsData] = await Promise.all([
         api.get(`/work-hours/summary?${sParams}`),
         getProjectsList(),
         getUsersList(),
-        api.get('/global/assignments'),
         getGlobalTeams().catch(() => []),
       ])
-      setRecords(rRes.data)
       setSummary(sRes.data)
       setProjects(projectsData)
       setUsers(usersData)
-      setActiveAssignments(aRes.data.filter(a => a.status !== 'Completed'))
       setTeams(teamsData)
+      // Reset records when filters change — user must re-expand to reload
+      setRecords([])
+      setRecordsTotal(0)
+      setRecordsOffset(0)
+      if (showRecords) loadRecords(0)
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
+  }
+
+  const loadRecords = async (offset = 0) => {
+    setRecordsLoading(true)
+    try {
+      const params = buildParams()
+      params.append('limit', RECORDS_LIMIT)
+      params.append('offset', offset)
+      const res = await api.get(`/work-hours?${params}`)
+      // Handle both new paginated format {total, records} and old plain-array format
+      if (Array.isArray(res.data)) {
+        setRecords(res.data)
+        setRecordsTotal(res.data.length)
+      } else {
+        setRecords(Array.isArray(res.data?.records) ? res.data.records : [])
+        setRecordsTotal(res.data?.total ?? 0)
+      }
+      setRecordsOffset(offset)
+    } catch(e) {
+      console.error(e)
+      setRecords([])
+      setRecordsTotal(0)
+    }
+    finally { setRecordsLoading(false) }
+  }
+
+  const toggleRecords = () => {
+    if (!showRecords) {
+      setShowRecords(true)
+      loadRecords(0)
+    } else {
+      setShowRecords(false)
+    }
   }
 
   const _loadTimer = useRef(null)
@@ -130,6 +176,7 @@ export default function WorkHours() {
       onConfirm: async () => {
         await api.delete(`/work-hours/${id}`)
         load()
+        if (showRecords) loadRecords(recordsOffset)
       }
     })
   }
@@ -157,8 +204,16 @@ export default function WorkHours() {
 
       <div className="max-w-screen-xl mx-auto px-6 py-5">
 
-        {/* Summary cards */}
-        {summary && (
+        {/* Summary cards — skeleton while loading */}
+        {loading && (
+          <div className="grid grid-cols-6 gap-3 mb-5">
+            {[...Array(6)].map((_,i) => (
+              <div key={i} className="bg-gray-100 rounded-2xl p-4 border border-white shadow-sm animate-pulse h-24" />
+            ))}
+          </div>
+        )}
+
+        {!loading && summary && (
           <div className="grid grid-cols-6 gap-3 mb-5 stagger">
             {[
               {icon:'⏱️', label:'Total Time Taken', value:`${fmtHours(summary.total_hours)}h`, color:'from-violet-100 to-purple-100'},
@@ -226,13 +281,13 @@ export default function WorkHours() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">🏁 Milestone</label>
-              <select className="select text-xs h-8" value={filters.milestone_num} onChange={e => setFilter('milestone_num', e.target.value)}>
-                <option value="">All milestones</option>
-                {[...new Set(activeAssignments.map(a => a.milestone_num).filter(Boolean))].sort((a,b)=>a-b).map(n => (
-                  <option key={n} value={n}>M{String(n).padStart(2,'0')}</option>
-                ))}
-              </select>
+              <label className="block text-xs text-gray-500 mb-1">🏁 Milestone #</label>
+              <input
+                type="number" min="1" placeholder="e.g. 1"
+                className="input text-xs h-8"
+                value={filters.milestone_num}
+                onChange={e => setFilter('milestone_num', e.target.value)}
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-xs text-gray-500 mb-1">📈 Time analysis view</label>
@@ -254,6 +309,14 @@ export default function WorkHours() {
           <div className={clsx('mb-4 px-4 py-2.5 rounded-xl text-sm animate-fade-up',
             msg.type==='error'?'bg-rose-50 text-rose-600':'bg-emerald-50 text-emerald-700')}>
             {msg.text}
+          </div>
+        )}
+
+        {/* Charts — skeleton while loading */}
+        {loading && (
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="col-span-2 bg-gray-100 rounded-2xl h-64 animate-pulse" />
+            <div className="bg-gray-100 rounded-2xl h-64 animate-pulse" />
           </div>
         )}
 
@@ -295,6 +358,14 @@ export default function WorkHours() {
           </div>
         )}
 
+        {/* Team-wise + time-analysis — skeleton while loading */}
+        {loading && (
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="bg-gray-100 rounded-2xl h-40 animate-pulse" />
+            <div className="col-span-2 bg-gray-100 rounded-2xl h-40 animate-pulse" />
+          </div>
+        )}
+
         {/* Team-wise + time-analysis */}
         {!loading && summary && (
           <div className="grid grid-cols-3 gap-4 mb-5">
@@ -331,52 +402,99 @@ export default function WorkHours() {
           </div>
         )}
 
-        {/* Records table */}
+        {/* Records table — lazy loaded on expand */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="grid px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-xs font-semibold text-white"
-               style={{gridTemplateColumns:'1.3fr 1.3fr 1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr 1fr 0.8fr'}}>
-            <div>Employee</div><div>Project</div><div>Task</div>
-            <div>Date</div><div>Start</div><div>End</div>
-            <div>Total</div><div>Buffer</div><div>Actual</div><div>Action</div>
-          </div>
+          {/* Clickable header to expand/collapse */}
+          <button
+            onClick={toggleRecords}
+            className="w-full flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <span className="transition-transform duration-200" style={{display:'inline-block', transform: showRecords ? 'rotate(90deg)' : 'rotate(0deg)'}}>▶</span>
+              <span>📋 Detailed Records</span>
+              {recordsTotal > 0 && (
+                <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">
+                  {recordsTotal} total
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-emerald-100">
+              {showRecords ? 'Click to collapse' : 'Click to load records'}
+            </span>
+          </button>
 
-          {loading ? (
-            <div className="text-center py-12 text-emerald-400 animate-pulse">
-              <div className="text-3xl mb-2">⏱️</div>
-              <div className="text-xs">Loading work hours...</div>
-            </div>
-          ) : records.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="text-4xl mb-3 animate-float">⏱️</div>
-              <p className="text-sm font-medium text-gray-700 mb-1">No work hours logged yet</p>
-              <p className="text-xs text-gray-400 mb-4">Start tracking time spent on tasks</p>
-              <p className="text-xs text-violet-500">Use Timesheet Calendar → 🗓️ Log to log your first entry</p>
-            </div>
-          ) : records.map((r, i) => (
-            <div key={r.id}
-              className={clsx('grid px-4 py-3 items-center border-b border-gray-50 last:border-0 text-xs hover:bg-emerald-50/20 transition-colors',
-                i%2===0?'bg-white':'bg-slate-50/30')}
-              style={{gridTemplateColumns:'1.3fr 1.3fr 1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr 1fr 0.8fr'}}>
-              <div>
-                <div className="font-semibold text-gray-800">{r.user_name}</div>
-                <div className="text-gray-400">{r.team_name || r.user_role}</div>
+          {showRecords && (
+            <>
+              {/* Column headers */}
+              <div className="grid px-4 py-2 bg-emerald-50 border-b border-emerald-100 text-xs font-semibold text-emerald-700"
+                   style={{gridTemplateColumns:'1.3fr 1.3fr 1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr 1fr 0.8fr'}}>
+                <div>Employee</div><div>Project</div><div>Task</div>
+                <div>Date</div><div>Start</div><div>End</div>
+                <div>Total</div><div>Buffer</div><div>Actual</div><div>Action</div>
               </div>
-              <div className="text-gray-700 truncate">{r.project_name}</div>
-              <div className="text-gray-700 truncate font-medium">
-                {r.task_name}
-                {r.milestone_num && <div className="text-gray-400">M{String(r.milestone_num).padStart(2,'0')}</div>}
-              </div>
-              <div className="text-gray-500">{r.date}</div>
-              <div className="text-gray-500">{r.start_time ? new Date(r.start_time).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>
-              <div className="text-gray-500">{r.end_time ? new Date(r.end_time).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>
-              <div className="font-semibold text-gray-600">{fmtHours(r.hours_spent)}h</div>
-              <div className="text-rose-500">{fmtHours(r.buffer_hours || 0)}h</div>
-              <div className="font-bold text-cyan-600">{fmtHours(r.actual_working_hours)}h</div>
-              <div>
-                <button onClick={() => handleDelete(r.id)} className="btn text-xs py-1 px-2 hover:text-rose-600 hover:border-rose-200">🗑️</button>
-              </div>
-            </div>
-          ))}
+
+              {recordsLoading ? (
+                <div className="text-center py-10 text-emerald-400 animate-pulse">
+                  <div className="text-3xl mb-2">⏱️</div>
+                  <div className="text-xs">Loading records...</div>
+                </div>
+              ) : records.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-3xl mb-2">⏱️</div>
+                  <p className="text-sm text-gray-500">No work hours logged for this filter</p>
+                </div>
+              ) : (
+                <>
+                  {records.map((r, i) => (
+                    <div key={r.id}
+                      className={clsx('grid px-4 py-3 items-center border-b border-gray-50 last:border-0 text-xs hover:bg-emerald-50/20 transition-colors',
+                        i%2===0?'bg-white':'bg-slate-50/30')}
+                      style={{gridTemplateColumns:'1.3fr 1.3fr 1.6fr 0.9fr 0.9fr 0.9fr 0.8fr 0.9fr 1fr 0.8fr'}}>
+                      <div>
+                        <div className="font-semibold text-gray-800">{r.user_name}</div>
+                        <div className="text-gray-400">{r.team_name || r.user_role}</div>
+                      </div>
+                      <div className="text-gray-700 truncate">{r.project_name}</div>
+                      <div className="text-gray-700 truncate font-medium">
+                        {r.task_name}
+                        {r.milestone_num && <div className="text-gray-400">M{String(r.milestone_num).padStart(2,'0')}</div>}
+                      </div>
+                      <div className="text-gray-500">{r.date}</div>
+                      <div className="text-gray-500">{r.start_time ? new Date(r.start_time).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>
+                      <div className="text-gray-500">{r.end_time ? new Date(r.end_time).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>
+                      <div className="font-semibold text-gray-600">{fmtHours(r.hours_spent)}h</div>
+                      <div className="text-rose-500">{fmtHours(r.buffer_hours || 0)}h</div>
+                      <div className="font-bold text-cyan-600">{fmtHours(r.actual_working_hours)}h</div>
+                      <div>
+                        <button onClick={() => handleDelete(r.id)} className="btn text-xs py-1 px-2 hover:text-rose-600 hover:border-rose-200">🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Pagination bar */}
+                  {recordsTotal > RECORDS_LIMIT && (
+                    <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-100">
+                      <span className="text-xs text-gray-500">
+                        Showing {recordsOffset + 1}–{Math.min(recordsOffset + RECORDS_LIMIT, recordsTotal)} of {recordsTotal} records
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          disabled={recordsOffset === 0}
+                          onClick={() => loadRecords(recordsOffset - RECORDS_LIMIT)}
+                          className="btn text-xs px-3 py-1 disabled:opacity-40"
+                        >← Prev</button>
+                        <button
+                          disabled={recordsOffset + RECORDS_LIMIT >= recordsTotal}
+                          onClick={() => loadRecords(recordsOffset + RECORDS_LIMIT)}
+                          className="btn text-xs px-3 py-1 disabled:opacity-40"
+                        >Next →</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
 

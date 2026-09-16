@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { MILESTONES } from '../utils/helpers'
 import api from '../utils/api'
@@ -9,22 +9,69 @@ const MS_ICONS = ['🚀','🤝','🔍','📝','⚙️','🧪','📦','✅','🌟
 export default function ExportPage() {
   const { id } = useParams()
   const [downloading, setDownloading] = useState(null)
-  const [exportMode, setExportMode] = useState('all')   // 'all' | 'single'
-  const [selectedMs, setSelectedMs] = useState(1)
-  const [success, setSuccess] = useState(null)
+  const [success, setSuccess]         = useState(null)
+
+  // Active milestones fetched from API so we only show what's configured for this project
+  const [activeMilestones, setActiveMilestones] = useState([])
+  const [loadingMs, setLoadingMs]               = useState(true)
+
+  // Multi-select: set of selected milestone nums
+  const [selected, setSelected] = useState(new Set())
+
+  // Fetch active milestones on mount
+  // milestone-progress returns { project_pct, milestones: [{num, status, pct}] }
+  // We enrich each entry with the name from the MILESTONES constant
+  useEffect(() => {
+    api.get(`/projects/${id}/milestone-progress`)
+      .then(r => {
+        const list = r.data?.milestones || []
+        const sorted = [...list]
+          .sort((a, b) => a.num - b.num)
+          .map(m => ({
+            ...m,
+            name: MILESTONES.find(c => c.num === m.num)?.name || `Milestone ${m.num}`,
+          }))
+        setActiveMilestones(sorted)
+        setSelected(new Set(sorted.map(m => m.num)))
+      })
+      .catch(() => setActiveMilestones([]))
+      .finally(() => setLoadingMs(false))
+  }, [id])
+
+  const total    = activeMilestones.length
+  const allSel   = selected.size === total && total > 0
+  const noneSel  = selected.size === 0
+
+  const toggleAll = () => {
+    if (allSel) setSelected(new Set())
+    else        setSelected(new Set(activeMilestones.map(m => m.num)))
+  }
+
+  const toggleMs = (num) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(num)) next.delete(num)
+      else               next.add(num)
+      return next
+    })
+  }
 
   const download = async (type) => {
-    const key = `${exportMode}-${type}`
+    if (noneSel) return
+    const key = `dl-${type}`
     setDownloading(key)
     setSuccess(null)
     try {
-      const url = exportMode === 'all'
-        ? `/projects/${id}/export/${type}`
-        : `/projects/${id}/export/${type}?milestone=${selectedMs}`
+      // If all milestones selected, omit param so backend exports everything
+      const selNums = [...selected].sort((a,b) => a - b)
+      const msParam = selected.size === total
+        ? ''
+        : `?milestones=${selNums.join(',')}`
+      const url = `/projects/${id}/export/${type}${msParam}`
       const res = await api.get(url, { responseType: 'blob' })
       const blobUrl = URL.createObjectURL(res.data)
       const a = document.createElement('a')
-      const msLabel = exportMode === 'single' ? `-M${String(selectedMs).padStart(2,'0')}` : ''
+      const msLabel = selected.size === total ? '' : `-M${selNums.map(n => String(n).padStart(2,'0')).join('-')}`
       a.href = blobUrl
       a.download = `project-wbs${msLabel}.${type}`
       a.click()
@@ -37,6 +84,16 @@ export default function ExportPage() {
       setDownloading(null)
     }
   }
+
+  // Summary label for the export
+  const summaryLabel = (() => {
+    if (noneSel) return '⚠️ No milestones selected'
+    if (selected.size === total) return `All ${total} milestones — complete project report`
+    const names = activeMilestones
+      .filter(m => selected.has(m.num))
+      .map(m => `M${String(m.num).padStart(2,'0')} ${m.name}`)
+    return names.join(', ')
+  })()
 
   return (
     <div className="max-w-2xl animate-fade-up">
@@ -60,79 +117,91 @@ export default function ExportPage() {
         </div>
       )}
 
-      {/* Export mode selector */}
+      {/* Milestone multi-select panel */}
       <div className="card mb-4">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          📌 What do you want to export?
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setExportMode('all')}
-            className={clsx('p-4 rounded-2xl border-2 text-left transition-all duration-200',
-              exportMode === 'all'
-                ? 'border-violet-400 bg-violet-50'
-                : 'border-gray-100 bg-white hover:border-violet-200'
+        {/* Panel header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            📌 Select Milestones to Export
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Count chip */}
+            <span className={clsx(
+              'px-2 py-0.5 rounded-full text-xs font-semibold',
+              noneSel
+                ? 'bg-red-100 text-red-600'
+                : selected.size === total
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'bg-amber-100 text-amber-700'
             )}>
-            <div className="text-2xl mb-2">📦</div>
-            <div className={clsx('text-sm font-semibold mb-1', exportMode === 'all' ? 'text-violet-700' : 'text-gray-800')}>
-              All Milestones
-            </div>
-            <div className="text-xs text-gray-400">Export complete project — all 10 milestones</div>
-            {exportMode === 'all' && (
-              <div className="mt-2 text-xs text-violet-600 font-medium">✓ Selected</div>
+              {selected.size} of {total} selected
+            </span>
+            {/* Select All / Deselect All */}
+            {!loadingMs && total > 0 && (
+              <button
+                onClick={toggleAll}
+                className="text-xs text-violet-600 hover:text-violet-800 font-medium underline underline-offset-2 transition-colors">
+                {allSel ? 'Deselect all' : 'Select all'}
+              </button>
             )}
-          </button>
-
-          <button
-            onClick={() => setExportMode('single')}
-            className={clsx('p-4 rounded-2xl border-2 text-left transition-all duration-200',
-              exportMode === 'single'
-                ? 'border-violet-400 bg-violet-50'
-                : 'border-gray-100 bg-white hover:border-violet-200'
-            )}>
-            <div className="text-2xl mb-2">🎯</div>
-            <div className={clsx('text-sm font-semibold mb-1', exportMode === 'single' ? 'text-violet-700' : 'text-gray-800')}>
-              Selected Milestone
-            </div>
-            <div className="text-xs text-gray-400">Export one specific milestone only</div>
-            {exportMode === 'single' && (
-              <div className="mt-2 text-xs text-violet-600 font-medium">✓ Selected</div>
-            )}
-          </button>
+          </div>
         </div>
 
-        {/* Milestone selector */}
-        {exportMode === 'single' && (
-          <div className="mt-4 animate-fade-up">
-            <div className="text-xs font-medium text-gray-600 mb-2">Choose milestone to export:</div>
-            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-              {MILESTONES.map((ms, i) => (
+        {/* Milestone grid */}
+        {loadingMs ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        ) : total === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">
+            No active milestones configured for this project.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+            {activeMilestones.map((ms, i) => {
+              const isSel = selected.has(ms.num)
+              return (
                 <button
                   key={ms.num}
-                  onClick={() => setSelectedMs(ms.num)}
-                  className={clsx('flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all text-xs',
-                    selectedMs === ms.num
+                  onClick={() => toggleMs(ms.num)}
+                  className={clsx(
+                    'flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all text-xs',
+                    isSel
                       ? 'border-violet-400 bg-violet-50 text-violet-700'
                       : 'border-gray-100 bg-white hover:border-violet-200 text-gray-600'
                   )}>
-                  <span className="text-base">{MS_ICONS[i]}</span>
-                  <span className="font-medium">{String(ms.num).padStart(2,'0')}</span>
+                  {/* Checkbox indicator */}
+                  <span className={clsx(
+                    'w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-all',
+                    isSel
+                      ? 'bg-violet-500 border-violet-500 text-white'
+                      : 'border-gray-300 bg-white'
+                  )}>
+                    {isSel && <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-white">
+                      <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>}
+                  </span>
+                  <span className="text-base">{MS_ICONS[i % MS_ICONS.length]}</span>
+                  <span className="font-semibold">{String(ms.num).padStart(2,'0')}</span>
                   <span className="truncate">{ms.name}</span>
-                  {selectedMs === ms.num && <span className="ml-auto">✓</span>}
                 </button>
-              ))}
-            </div>
+              )
+            })}
           </div>
         )}
       </div>
 
       {/* Export summary */}
-      <div className="mb-4 px-4 py-3 bg-violet-50 border border-violet-100 rounded-2xl text-xs text-violet-700">
+      <div className={clsx(
+        'mb-4 px-4 py-3 border rounded-2xl text-xs',
+        noneSel
+          ? 'bg-red-50 border-red-100 text-red-600'
+          : 'bg-violet-50 border-violet-100 text-violet-700'
+      )}>
         <span className="font-semibold">📋 Exporting: </span>
-        {exportMode === 'all'
-          ? 'All 10 milestones — complete project report'
-          : `Milestone ${String(selectedMs).padStart(2,'0')} — ${MILESTONES.find(m => m.num === selectedMs)?.name}`
-        }
+        {summaryLabel}
       </div>
 
       {/* Download buttons */}
@@ -149,14 +218,16 @@ export default function ExportPage() {
             <div className="text-xs text-gray-400 mb-4 leading-relaxed">{desc}</div>
             <button
               onClick={() => download(type)}
-              disabled={!!downloading}
+              disabled={!!downloading || noneSel || loadingMs}
               className={clsx(
                 'w-full h-10 rounded-xl text-xs font-semibold text-white transition-all duration-200 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg',
                 `bg-gradient-to-r ${color} ${shadow}`
               )}>
-              {downloading === `${exportMode}-${type}`
+              {downloading === `dl-${type}`
                 ? <><span className="animate-spin text-base">⟳</span> Downloading…</>
-                : <><span>⬇️</span> Download .{type}</>}
+                : noneSel
+                  ? '⚠️ Select milestones'
+                  : <><span>⬇️</span> Download .{type}</>}
             </button>
           </div>
         ))}

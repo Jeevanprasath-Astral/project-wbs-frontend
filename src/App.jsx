@@ -44,6 +44,8 @@ const BillingStatusReportPage      = lazy(() => import('./pages/global/BillingSt
 const AuditLogPage                 = lazy(() => import('./pages/global/AuditLogPage'))
 const ProposalEstimatesPage        = lazy(() => import('./pages/global/ProposalEstimatesPage'))
 const ProposalEstimateDetailPage   = lazy(() => import('./pages/global/ProposalEstimateDetailPage'))
+// Demo entry — public route (no login required)
+const DemoEntry = lazy(() => import('./pages/DemoEntry'))
 
 function ProtectedRoute({ children }) {
   const token = useAppStore(s => s.token)
@@ -69,6 +71,8 @@ export default function App() {
         <Route path="/login"           element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
+        {/* Public demo entry — no token required */}
+        <Route path="/demo"            element={<DemoEntry />} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
         <Route path="/projects/new" element={<ProtectedRoute><ProjectSetup /></ProtectedRoute>} />

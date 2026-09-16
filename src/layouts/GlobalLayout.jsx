@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store'
 import { canAccessFinancialSettings, isElevated } from '../utils/permissions'
 import clsx from 'clsx'
+import DemoBanner from '../components/DemoBanner'
 
 const GLOBAL_NAV = [
   { icon: '📊', label: 'Dashboard',          path: '/global/dashboard' },
@@ -29,12 +30,14 @@ const SETTINGS_NAV = [
 ]
 
 export default function GlobalLayout() {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate    = useNavigate()
+  const location    = useLocation()
   const { user, logout } = useAppStore()
+  const isDemoMode  = useAppStore((s) => s.isDemoMode)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className={`flex h-screen overflow-hidden bg-slate-50${isDemoMode ? ' pt-8' : ''}`}>
+      <DemoBanner />
       <aside className="w-52 flex-shrink-0 flex flex-col sidebar-dark">
         <div className="p-4 border-b border-white/10">
           <button onClick={() => navigate('/')} className="flex items-center gap-2.5 w-full hover:opacity-80 transition-opacity">
@@ -145,3 +148,4 @@ export default function GlobalLayout() {
     </div>
   )
 }
+

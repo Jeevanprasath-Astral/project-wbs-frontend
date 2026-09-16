@@ -25,6 +25,15 @@ api.interceptors.response.use(
       localStorage.removeItem('wbs-store')
       window.location.href = '/login'
     }
+    // Demo write-guard: backend returns 403 with detail='demo-read-only'
+    // for any non-GET from a demo JWT. Fire a custom event so DemoBanner
+    // can show a toast — do NOT redirect or crash.
+    if (
+      err.response?.status === 403 &&
+      err.response?.data?.detail === 'demo-read-only'
+    ) {
+      window.dispatchEvent(new CustomEvent('demo-write-blocked'))
+    }
     return Promise.reject(err)
   }
 )

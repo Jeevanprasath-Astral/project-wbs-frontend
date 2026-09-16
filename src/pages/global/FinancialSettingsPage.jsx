@@ -3,7 +3,7 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 import { useAppStore } from '../../store'
-import { canAccessFinancialSettings } from '../../utils/permissions'
+import { canAccessFinancialSettings, canAccess } from '../../utils/permissions'
 import AttachmentPanel from '../../components/AttachmentPanel'
 import clsx from 'clsx'
 
@@ -60,15 +60,27 @@ export default function FinancialSettingsPage() {
   const [members,  setMembers]  = useState([])
   const [loading,  setLoading]  = useState(true)
 
+  // Collapsible sections (both collapsed by default — expand on click)
+  const [showBillingSection, setShowBillingSection] = useState(false)
+  const [showRatesSection,   setShowRatesSection]   = useState(false)
+
+  // Pre-loaded per-project billing summaries (total + count) for collapsed rows
+  const [billingSummary, setBillingSummary] = useState({})   // { pid: { total, count } }
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [pRes, mRes] = await Promise.all([
+      const [pRes, mRes, sumRes] = await Promise.all([
         api.get('/projects'),
         api.get('/global/team'),
+        api.get('/project-billings/summaries').catch(() => ({ data: [] })),
       ])
       setProjects(pRes.data)
       setMembers(mRes.data.filter(m => m.is_active))
+      // Build { project_id → { total, count } } lookup
+      const sumMap = {}
+      for (const s of sumRes.data) sumMap[s.project_id] = { total: s.total, count: s.count }
+      setBillingSummary(sumMap)
     } catch { /* silent */ }
     finally { setLoading(false) }
   }, [])
@@ -89,9 +101,17 @@ export default function FinancialSettingsPage() {
 
   const filteredProjects = projects.filter(p =>
     p.name.toLowerCase().includes(projectSearch.toLowerCase()))
-  const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-    m.role?.toLowerCase().includes(memberSearch.toLowerCase()))
+
+  // Cost Rates table: show ALL members; only Admin / PM / HR may edit rates
+  const RATE_EDIT_ROLES = new Set(['Admin', 'Project Manager', 'HR'])
+  const canEditRates = RATE_EDIT_ROLES.has(user?.role)
+  const filteredMembers = members
+    .filter(m =>
+      m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+      m.role?.toLowerCase().includes(memberSearch.toLowerCase()))
+
+  // Write permission for billing entries — uses DB-driven canAccess (Admin, PM, HR, FC Lead all have billing.create)
+  const canWriteBilling = canAccess(user, 'billing', 'create')
 
   // ── Billing history state ─────────────────────────────────────────────────────
   const [expanded,       setExpanded]       = useState(new Set())   // Set<project_id>
@@ -315,7 +335,11 @@ export default function FinancialSettingsPage() {
           <>
             {/* ── Section 1: Project Billing History — hidden from HR ───────── */}
             {user?.role !== 'HR' && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-3">
+              {/* Clickable header — toggles table */}
+              <div
+                className="px-5 py-4 flex items-center justify-between cursor-pointer select-none hover:bg-slate-50/60 transition-colors"
+                onClick={() => setShowBillingSection(v => !v)}
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-xl">💰</span>
                   <div>
@@ -323,6 +347,12 @@ export default function FinancialSettingsPage() {
                     <div className="text-xs text-gray-400">Plan vs actual — Planned Date auto-fills from selected milestone</div>
                   </div>
                 </div>
+                <span className={clsx('text-gray-400 text-sm transition-transform duration-200', showBillingSection && 'rotate-90')}>▶</span>
+              </div>
+
+              {showBillingSection && <>
+              {/* Search bar — inside expanded area, above the table */}
+              <div className="px-5 py-2.5 border-t border-gray-100 flex justify-end">
                 <input
                   type="text" placeholder="Search projects…"
                   className="input text-xs h-8 w-52"
@@ -374,10 +404,18 @@ export default function FinancialSettingsPage() {
                             </span>
                           </td>
                           <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
-                            {isExp && billings[p.id] ? fmtCurrency(total) : '—'}
+                            {billings[p.id]
+                              ? fmtCurrency(getBillingTotal(p.id))
+                              : billingSummary[p.id]
+                                ? fmtCurrency(billingSummary[p.id].total)
+                                : '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-center text-gray-400">
-                            {isExp && billings[p.id] ? entries.length : '—'}
+                          <td className="px-4 py-2.5 text-center text-gray-500">
+                            {billings[p.id]
+                              ? entries.length
+                              : billingSummary[p.id]
+                                ? billingSummary[p.id].count
+                                : '—'}
                           </td>
                         </tr>,
 
@@ -756,11 +794,16 @@ export default function FinancialSettingsPage() {
                 {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
                 {projectSearch && ` matching "${projectSearch}"`}
               </div>
+              </>}
             </div>}
 
-            {/* ── Section 2: Team Member Cost Rates ────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-3">
+            {/* ── Section 2: Team Member Cost Rates — Admin / PM / HR only ─── */}
+            {canEditRates && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {/* Clickable header — toggles table */}
+              <div
+                className="px-5 py-4 flex items-center justify-between cursor-pointer select-none hover:bg-slate-50/60 transition-colors"
+                onClick={() => setShowRatesSection(v => !v)}
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-xl">👷</span>
                   <div>
@@ -768,6 +811,12 @@ export default function FinancialSettingsPage() {
                     <div className="text-xs text-gray-400">Hourly cost rate per person — Manpower Cost = Hours worked × this rate</div>
                   </div>
                 </div>
+                <span className={clsx('text-gray-400 text-sm transition-transform duration-200', showRatesSection && 'rotate-90')}>▶</span>
+              </div>
+
+              {showRatesSection && <>
+              {/* Search bar — inside expanded area, above the table */}
+              <div className="px-5 py-2.5 border-t border-gray-100 flex justify-end">
                 <input
                   type="text" placeholder="Search by name or role…"
                   className="input text-xs h-8 w-52"
@@ -820,7 +869,7 @@ export default function FinancialSettingsPage() {
                               <button onClick={cancelRateEdit}
                                 className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
                             </div>
-                          ) : (
+                          ) : canEditRates ? (
                             <button
                               onClick={() => startRateEdit(m)}
                               className="group flex items-center gap-1 text-xs text-left rounded-lg px-2 py-1 hover:bg-violet-50 transition-colors">
@@ -829,6 +878,10 @@ export default function FinancialSettingsPage() {
                               </span>
                               <span className="opacity-0 group-hover:opacity-100 text-violet-400 text-xs transition-opacity">✏️</span>
                             </button>
+                          ) : (
+                            <span className={clsx('text-xs px-2', m.cost_rate ? 'text-gray-800 font-medium' : 'text-gray-400 italic')}>
+                              {m.cost_rate ? fmtCurrency(m.cost_rate) : '—'}
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -841,7 +894,8 @@ export default function FinancialSettingsPage() {
                 {filteredMembers.length} active member{filteredMembers.length !== 1 ? 's' : ''}
                 {memberSearch && ` matching "${memberSearch}"`}
               </div>
-            </div>
+              </>}
+            </div>}
           </>
         )}
       </div>

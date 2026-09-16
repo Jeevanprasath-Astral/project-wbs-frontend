@@ -1082,6 +1082,13 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen, isD
   const taskCount = ms.tasks?.length||0
   const fieldCount = ms.tasks?.reduce((a,t)=>a+(t.form_field_count||0),0)||0
 
+  // Compute milestone % client-side from task statuses (works without backend restart)
+  const msProgress = ms.status === 'Completed'
+    ? 100
+    : ms.tasks && ms.tasks.length > 0
+      ? Math.round((ms.tasks.filter(t => t.status === 'Completed').length / ms.tasks.length) * 100)
+      : (ms.progress ?? 0)
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fade-up">
       <div className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-violet-50/20 transition-colors" onClick={()=>setOpen(o=>!o)}>
@@ -1117,6 +1124,25 @@ function MilestoneCard({ ms, projectId, onUpdate, onDelete, team, forceOpen, isD
                 {ms.status}
               </span>
             )}
+            {/* Milestone completion % — computed client-side from task statuses */}
+            <span className="flex items-center gap-1.5">
+              <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md',
+                msProgress >= 100 ? 'bg-emerald-50 text-emerald-700'
+                  : msProgress > 0 ? 'bg-violet-50 text-violet-700'
+                  : 'bg-gray-50 text-gray-400')}>
+                {msProgress}%
+              </span>
+              <span className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <span
+                  className={clsx('h-full rounded-full block transition-all',
+                    msProgress >= 100 ? 'bg-emerald-500'
+                      : msProgress > 50 ? 'bg-violet-500'
+                      : msProgress > 0 ? 'bg-amber-400'
+                      : 'bg-gray-200')}
+                  style={{ width: `${msProgress}%` }}
+                />
+              </span>
+            </span>
             {(ms.iteration||1) > 1 && ms.revision_reason && (
               <span className="text-indigo-400 italic">{ms.revision_reason}</span>
             )}

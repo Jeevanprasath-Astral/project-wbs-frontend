@@ -33,7 +33,14 @@ export const useAppStore = create(
       // even when the user hasn't navigated away from the configure page.
       milestonesVersion: 0,
       bumpMilestonesVersion: () => set((s) => ({ milestonesVersion: s.milestonesVersion + 1 })),
+
+      // Demo mode — true when the current session was started via /demo (no login).
+      // Drives the DemoBanner component and prevents write-operation UI from hiding.
+      isDemoMode: false,
+      setDemoMode: (val) => set({ isDemoMode: val }),
     }),
-    { name: 'wbs-store', partialize: (s) => ({ user: s.user, token: s.token, activeProject: s.activeProject }) }
+    { name: 'wbs-store', partialize: (s) => ({
+        user: s.user, token: s.token, activeProject: s.activeProject, isDemoMode: s.isDemoMode,
+      }) }
   )
 )

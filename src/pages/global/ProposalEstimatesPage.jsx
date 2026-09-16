@@ -31,6 +31,21 @@ const BD_COLORS = [
   '#ef4444','#8b5cf6','#ec4899',
 ]
 
+// Render percentage labels INSIDE the donut arc (avoids overlap with the Legend)
+const RADIAN = Math.PI / 180
+const renderDonutLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent < 0.05) return null   // skip tiny slices — text won't fit
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + r * Math.cos(-midAngle * RADIAN)
+  const y = cy + r * Math.sin(-midAngle * RADIAN)
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"
+      fontSize={10} fontWeight="700">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
+
 function fmtDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -132,8 +147,7 @@ function ProposalDashboard({ proposals }) {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={byStatus} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
-                  dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
-                  labelLine={false} fontSize={10}>
+                  dataKey="value" label={renderDonutLabel} labelLine={false}>
                   {byStatus.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v) => [v, 'Count']} />
@@ -435,6 +449,9 @@ export default function ProposalEstimatesPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-gray-900 text-sm truncate">{p.client_name}</p>
+                    {p.contact_name && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">👤 {p.contact_name}{p.contact_designation ? ` · ${p.contact_designation}` : ''}</p>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-gray-600 truncate">{p.project_name || '—'}</p>
