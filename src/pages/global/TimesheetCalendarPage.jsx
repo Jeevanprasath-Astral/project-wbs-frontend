@@ -228,11 +228,11 @@ export default function TimesheetCalendarPage() {
         api.get(`/timesheet/permissions${userId ? `?user_id=${userId}` : ''}`),
       ])
       setCalendar(cRes.data)
-      setUsers(usersData)
-      setProjects(projectsData)
-      setHolidays(hRes.data)
-      setLeaves(lRes.data)
-      setPermissions(prRes.data)
+      setUsers(Array.isArray(usersData) ? usersData : [])
+      setProjects(Array.isArray(projectsData) ? projectsData : [])
+      setHolidays(Array.isArray(hRes.data) ? hRes.data : [])
+      setLeaves(Array.isArray(lRes.data) ? lRes.data : [])
+      setPermissions(Array.isArray(prRes.data) ? prRes.data : [])
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -388,7 +388,13 @@ export default function TimesheetCalendarPage() {
       if (trackerFilters.start_date) params.append('start_date', trackerFilters.start_date)
       if (trackerFilters.end_date)   params.append('end_date',   trackerFilters.end_date)
       const res = await api.get(`/hours-tracker/summary?${params}`)
-      setTrackerData(res.data)
+      const d = res.data || {}
+      setTrackerData({
+        ...d,
+        individual: Array.isArray(d.individual) ? d.individual : [],
+        project:    Array.isArray(d.project)    ? d.project    : [],
+        totals: d.totals || { leave:0, holiday:0, permission:0, billable:0, non_billable:0, no_work:0, training:0, rnd:0 },
+      })
     } catch(e) { console.error(e) }
     finally { setTrackerLoading(false) }
   }
