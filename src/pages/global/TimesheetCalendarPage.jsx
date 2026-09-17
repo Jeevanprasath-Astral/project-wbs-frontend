@@ -122,9 +122,14 @@ export default function TimesheetCalendarPage() {
   const closeDayEntry = () => { setEntryDay(null); setDayEntries([]); setEditingEntryId(null) }
 
   const refreshDayEntry = async () => {
-    const r = await api.get(`/work-hours?user_id=${userId}&date_from=${entryDay}&date_to=${entryDay}`)
-    setDayEntries(r.data)
-    load() // also refresh the calendar summary/Worked column
+    try {
+      const r = await api.get(`/work-hours?user_id=${userId}&date_from=${entryDay}&date_to=${entryDay}`)
+      setDayEntries(Array.isArray(r.data) ? r.data : [])
+    } catch(e) {
+      console.error('refreshDayEntry error:', e)
+    } finally {
+      load() // always refresh calendar summary even if entry list fetch failed
+    }
   }
 
   const WORK_TYPES = ['Billable', 'Non-Billable', 'No Work', 'Training', 'R&D', 'BD']

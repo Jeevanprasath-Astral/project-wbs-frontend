@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAppStore } from './store'
+import ErrorBoundary from './components/common/ErrorBoundary'
 // All non-shell pages are code-split via React.lazy so their JS is only
 // fetched when the route is first visited — keeps the initial bundle small.
 // AppLayout and GlobalLayout are eagerly loaded because they are the shells
@@ -80,40 +81,40 @@ export default function App() {
         {/* Global Hub */}
         <Route path="/global" element={<ProtectedRoute><GlobalLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/global/dashboard" replace />} />
-          <Route path="dashboard"   element={<GlobalDashboard />} />
-          <Route path="assignments" element={<GlobalAssignments />} />
-          <Route path="deadlines"   element={<GlobalDeadlines />} />
-          <Route path="workload"    element={<GlobalWorkload />} />
-          <Route path="hours"       element={<WorkHours />} />
-          <Route path="timesheet"   element={<TimesheetCalendarPage />} />
-          <Route path="team"        element={<GlobalTeam />} />
-          <Route path="reports"             element={<ProjectReportsPage />} />
-          <Route path="profitability"       element={<ProfitabilityReportPage />} />
-          <Route path="team-utilization"    element={<TeamUtilizationPage />} />
-          <Route path="cost-breakdown"      element={<CostBreakdownPage />} />
-          <Route path="billing-statement"        element={<BillingStatementPage />} />
-          <Route path="monthly-billing-tracker"  element={<MonthlyBillingTrackerPage />} />
-          <Route path="billing-status"           element={<BillingStatusReportPage />} />
-          <Route path="financial-settings"       element={<FinancialSettingsPage />} />
-          <Route path="audit-log"           element={<AuditLogPage />} />
-          <Route path="proposal-estimates"           element={<ProposalEstimatesPage />} />
-          <Route path="proposal-estimates/:id"       element={<ProposalEstimateDetailPage />} />
+          <Route path="dashboard"   element={<ErrorBoundary><GlobalDashboard /></ErrorBoundary>} />
+          <Route path="assignments" element={<ErrorBoundary><GlobalAssignments /></ErrorBoundary>} />
+          <Route path="deadlines"   element={<ErrorBoundary><GlobalDeadlines /></ErrorBoundary>} />
+          <Route path="workload"    element={<ErrorBoundary><GlobalWorkload /></ErrorBoundary>} />
+          <Route path="hours"       element={<ErrorBoundary><WorkHours /></ErrorBoundary>} />
+          <Route path="timesheet"   element={<ErrorBoundary><TimesheetCalendarPage /></ErrorBoundary>} />
+          <Route path="team"        element={<ErrorBoundary><GlobalTeam /></ErrorBoundary>} />
+          <Route path="reports"             element={<ErrorBoundary><ProjectReportsPage /></ErrorBoundary>} />
+          <Route path="profitability"       element={<ErrorBoundary><ProfitabilityReportPage /></ErrorBoundary>} />
+          <Route path="team-utilization"    element={<ErrorBoundary><TeamUtilizationPage /></ErrorBoundary>} />
+          <Route path="cost-breakdown"      element={<ErrorBoundary><CostBreakdownPage /></ErrorBoundary>} />
+          <Route path="billing-statement"        element={<ErrorBoundary><BillingStatementPage /></ErrorBoundary>} />
+          <Route path="monthly-billing-tracker"  element={<ErrorBoundary><MonthlyBillingTrackerPage /></ErrorBoundary>} />
+          <Route path="billing-status"           element={<ErrorBoundary><BillingStatusReportPage /></ErrorBoundary>} />
+          <Route path="financial-settings"       element={<ErrorBoundary><FinancialSettingsPage /></ErrorBoundary>} />
+          <Route path="audit-log"           element={<ErrorBoundary><AuditLogPage /></ErrorBoundary>} />
+          <Route path="proposal-estimates"           element={<ErrorBoundary><ProposalEstimatesPage /></ErrorBoundary>} />
+          <Route path="proposal-estimates/:id"       element={<ErrorBoundary><ProposalEstimateDetailPage /></ErrorBoundary>} />
         </Route>
 
         {/* Project-specific */}
         <Route path="/projects/:id" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard"      element={<AdminDashboard />} />
-          <Route path="milestone/:num" element={<MilestonePage />} />
+          <Route path="dashboard"      element={<ErrorBoundary><AdminDashboard /></ErrorBoundary>} />
+          <Route path="milestone/:num" element={<ErrorBoundary><MilestonePage /></ErrorBoundary>} />
           <Route path="milestones"     element={<Navigate to="milestone/1" replace />} />
-          <Route path="team"           element={<TeamPage />} />
-          <Route path="notifications"  element={<NotificationsPage />} />
-          <Route path="audit"          element={<AuditPage />} />
-          <Route path="export"         element={<ExportPage />} />
-          <Route path="assignments"    element={<AssignmentsPage />} />
-          <Route path="working-hours"  element={<WorkingHoursPage />} />
-          <Route path="cost-management" element={<CostManagementPage />} />
-          <Route path="configure-milestones" element={<CustomMilestonesPage />} />
+          <Route path="team"           element={<ErrorBoundary><TeamPage /></ErrorBoundary>} />
+          <Route path="notifications"  element={<ErrorBoundary><NotificationsPage /></ErrorBoundary>} />
+          <Route path="audit"          element={<ErrorBoundary><AuditPage /></ErrorBoundary>} />
+          <Route path="export"         element={<ErrorBoundary><ExportPage /></ErrorBoundary>} />
+          <Route path="assignments"    element={<ErrorBoundary><AssignmentsPage /></ErrorBoundary>} />
+          <Route path="working-hours"  element={<ErrorBoundary><WorkingHoursPage /></ErrorBoundary>} />
+          <Route path="cost-management" element={<ErrorBoundary><CostManagementPage /></ErrorBoundary>} />
+          <Route path="configure-milestones" element={<ErrorBoundary><CustomMilestonesPage /></ErrorBoundary>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
