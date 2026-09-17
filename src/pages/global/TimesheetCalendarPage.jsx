@@ -115,7 +115,8 @@ export default function TimesheetCalendarPage() {
     setLoadingDay(true)
     try {
       const r = await api.get(`/work-hours?user_id=${userId}&date_from=${date}&date_to=${date}`)
-      setDayEntries(r.data)
+      // Backend returns paginated object { total, offset, limit, records: [...] }
+      setDayEntries(Array.isArray(r.data?.records) ? r.data.records : [])
     } catch(e) { console.error(e) }
     finally { setLoadingDay(false) }
   }
@@ -124,7 +125,8 @@ export default function TimesheetCalendarPage() {
   const refreshDayEntry = async () => {
     try {
       const r = await api.get(`/work-hours?user_id=${userId}&date_from=${entryDay}&date_to=${entryDay}`)
-      setDayEntries(Array.isArray(r.data) ? r.data : [])
+      // Backend returns paginated object { total, offset, limit, records: [...] }
+      setDayEntries(Array.isArray(r.data?.records) ? r.data.records : [])
     } catch(e) {
       console.error('refreshDayEntry error:', e)
     } finally {
