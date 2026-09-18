@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { preloadPage } from '../utils/pageDataStore'
 import { getProjectTeam, getProjectCustomMilestones, getAssignmentCategories, getUsersList } from '../utils/masterData'
 import DemoBanner from '../components/DemoBanner'
+import ChatBot from '../components/ChatBot'
 
 const NAV = [
   { icon: '🏁', emoji: true, label: 'Milestone Config', path: 'configure-milestones' },
@@ -226,6 +227,9 @@ export default function AppLayout() {
           </div>
         </div>
       </aside>
+
+      {/* ── AXON Chatbot (floating, always visible) ───────────────────────── */}
+      <ChatBot />
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className={`flex-1 flex flex-col overflow-hidden${isDemoMode ? ' pt-8' : ''}`}>

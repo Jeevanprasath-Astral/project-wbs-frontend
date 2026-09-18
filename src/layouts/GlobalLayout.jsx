@@ -3,6 +3,7 @@ import { useAppStore } from '../store'
 import { canAccessFinancialSettings, isElevated } from '../utils/permissions'
 import clsx from 'clsx'
 import DemoBanner from '../components/DemoBanner'
+import ChatBot from '../components/ChatBot'
 
 const GLOBAL_NAV = [
   { icon: '📊', label: 'Dashboard',          path: '/global/dashboard' },
@@ -38,6 +39,7 @@ export default function GlobalLayout() {
   return (
     <div className={`flex h-screen overflow-hidden bg-slate-50${isDemoMode ? ' pt-8' : ''}`}>
       <DemoBanner />
+      <ChatBot />
       <aside className="w-52 flex-shrink-0 flex flex-col sidebar-dark">
         <div className="p-4 border-b border-white/10">
           <button onClick={() => navigate('/')} className="flex items-center gap-2.5 w-full hover:opacity-80 transition-opacity">

@@ -298,7 +298,7 @@ export default function ChatBot() {
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-white">AXON Assistant</div>
-            <div className="text-xs text-violet-200">Powered by Gemini AI</div>
+            <div className="text-xs text-violet-200">Powered by Groq AI</div>
           </div>
 
           {/* Download button — only shown when there are messages */}
