@@ -53,6 +53,12 @@ export default function ProjectsPage() {
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null) // project to confirm
 
+  // Status Report modal state
+  const [srProject, setSrProject] = useState(null)
+  const [srForm, setSrForm] = useState({ to_emails: '', note: '', completed_this_week: '', plan_next_week: '' })
+  const [srLoading, setSrLoading] = useState(false)
+  const [srSending, setSrSending] = useState(false)
+
   const showMsg = (text, type = 'success') => { setMsg({ text, type }); setTimeout(() => setMsg(null), 3500) }
 
   const load = (isRetry = false) => {
@@ -149,6 +155,33 @@ export default function ProjectsPage() {
       showMsg(`"${confirmDelete.name}" deleted`)
     } catch(e) { showMsg(e.response?.data?.detail || 'Failed to delete', 'error') }
     finally { setDeletingId(null); setConfirmDelete(null) }
+  }
+
+  const openStatusReport = async (e, p) => {
+    e.stopPropagation()
+    setSrProject(p)
+    setSrForm({ to_emails: '', note: '', completed_this_week: '', plan_next_week: '' })
+    setSrLoading(true)
+    try {
+      const res = await api.get(`/projects/${p.id}/weekly-summary`)
+      setSrForm(f => ({
+        ...f,
+        completed_this_week: res.data.completed_this_week || '',
+        plan_next_week: res.data.plan_next_week || '',
+      }))
+    } catch { /* leave empty if fetch fails — user can type manually */ }
+    finally { setSrLoading(false) }
+  }
+
+  const sendStatusReport = async () => {
+    if (!srForm.to_emails.trim()) { showMsg('Please enter at least one email address', 'error'); return }
+    setSrSending(true)
+    try {
+      await api.post(`/projects/${srProject.id}/send-status-report`, srForm)
+      showMsg('Status report sent to client! 📧')
+      setSrProject(null)
+    } catch (e) { showMsg(e.response?.data?.detail || 'Failed to send report', 'error') }
+    finally { setSrSending(false) }
   }
 
   const isAdmin = user?.role === 'Admin'
@@ -350,6 +383,14 @@ export default function ProjectsPage() {
                               >
                                 ✏️
                               </button>
+                              {/* Send Status Report to Client */}
+                              <button
+                                onClick={e => openStatusReport(e, p)}
+                                className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm transition-colors"
+                                title="Send Status Report to Client"
+                              >
+                                📧
+                              </button>
                               {/* Delete button — Admin only */}
                               {isAdmin && (
                                 <button
@@ -458,6 +499,94 @@ export default function ProjectsPage() {
               <button onClick={() => setEditProject(null)} className="btn text-sm">Cancel</button>
               <button onClick={handleEditSave} disabled={savingEdit} className="btn btn-primary text-sm">
                 {savingEdit ? 'Saving...' : '💾 Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Status Report Modal */}
+      {srProject && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-fade-up max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+                     style={{background:'linear-gradient(135deg,#059669,#065f46)'}}>📧</div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900">Send Status Report to Client</h2>
+                  <p className="text-xs text-gray-400">{srProject.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setSrProject(null)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            {/* Body */}
+            <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Client Email(s) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  className="input text-sm"
+                  placeholder="client@company.com, cto@company.com"
+                  value={srForm.to_emails}
+                  onChange={e => setSrForm(f => ({...f, to_emails: e.target.value}))}
+                />
+                <p className="text-[10px] text-gray-400 mt-0.5">Separate multiple emails with commas</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Note to Client <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  className="input text-sm h-16 resize-none"
+                  placeholder="Please find the latest project status update below..."
+                  value={srForm.note}
+                  onChange={e => setSrForm(f => ({...f, note: e.target.value}))}
+                />
+              </div>
+              {srLoading ? (
+                <div className="text-center text-xs text-gray-400 py-4">⏳ Loading weekly summary...</div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-emerald-700 mb-1 block">
+                      ✅ Completed This Week
+                      <span className="text-gray-400 font-normal ml-1">(auto-filled, editable)</span>
+                    </label>
+                    <textarea
+                      className="w-full text-sm border border-emerald-200 rounded-xl px-3 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-emerald-50 placeholder-gray-400"
+                      placeholder={"• M02 Requirements gathering completed\n• Design review session held"}
+                      value={srForm.completed_this_week}
+                      onChange={e => setSrForm(f => ({...f, completed_this_week: e.target.value}))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-blue-700 mb-1 block">
+                      📅 Plan for Next Week
+                      <span className="text-gray-400 font-normal ml-1">(auto-filled, editable)</span>
+                    </label>
+                    <textarea
+                      className="w-full text-sm border border-blue-200 rounded-xl px-3 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 bg-blue-50 placeholder-gray-400"
+                      placeholder={"• Begin M03 Design & Architecture sprint\n• Wireframe review with stakeholders"}
+                      value={srForm.plan_next_week}
+                      onChange={e => setSrForm(f => ({...f, plan_next_week: e.target.value}))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="flex gap-2 justify-end p-5 border-t border-gray-100">
+              <button onClick={() => setSrProject(null)} className="btn text-sm">Cancel</button>
+              <button
+                onClick={sendStatusReport}
+                disabled={srSending || srLoading}
+                className="btn text-sm px-5"
+                style={{background:'linear-gradient(135deg,#059669,#065f46)',color:'#fff',border:'none'}}
+              >
+                {srSending ? 'Sending…' : '📧 Send Report'}
               </button>
             </div>
           </div>
