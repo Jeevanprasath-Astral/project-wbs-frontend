@@ -15,6 +15,7 @@ const NAV = [
   { icon: '📌', emoji: true, label: 'Assignments',      path: 'assignments' },
   { icon: '⏱️', emoji: true, label: 'Working Hours',    path: 'working-hours' },
   { icon: '💰', emoji: true, label: 'Cost Management',  path: 'cost-management' },
+  { icon: '🚩', emoji: true, label: 'Issues',           path: 'issues' },
   { icon: '🔔', emoji: true, label: 'Notifications',    path: 'notifications', badge: true },
   { icon: '📋', emoji: true, label: 'Audit log',        path: 'audit',         adminOnly: true },
   { icon: '⬇️', emoji: true, label: 'Export',           path: 'export' },

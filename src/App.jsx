@@ -18,6 +18,7 @@ const HomePage        = lazy(() => import('./pages/HomePage'))
 const ProjectsPage          = lazy(() => import('./pages/ProjectsPage'))
 const ProjectSetup          = lazy(() => import('./pages/ProjectSetup'))
 const AdminDashboard        = lazy(() => import('./pages/admin/AdminDashboard'))
+const IssuesPage            = lazy(() => import('./pages/admin/IssuesPage'))
 const MilestonePage         = lazy(() => import('./pages/milestone/MilestonePage'))
 const TeamPage              = lazy(() => import('./pages/admin/TeamPage'))
 const NotificationsPage     = lazy(() => import('./pages/admin/NotificationsPage'))
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="working-hours"  element={<ErrorBoundary><WorkingHoursPage /></ErrorBoundary>} />
           <Route path="cost-management" element={<ErrorBoundary><CostManagementPage /></ErrorBoundary>} />
           <Route path="configure-milestones" element={<ErrorBoundary><CustomMilestonesPage /></ErrorBoundary>} />
+          <Route path="issues"             element={<ErrorBoundary><IssuesPage /></ErrorBoundary>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
