@@ -311,7 +311,7 @@ export default function TimesheetCalendarPage() {
     { key: 'permission', fieldsKey: 'permission', icon: '✅', name: 'Permission Report (approved only)' },
   ]
   const REPORT_FIELDS = {
-    individual_time: [['start_date','Start Date'], ['end_date','End Date'], ['project','Project'], ['billable','Billable / Non-Billable'], ['hours','Number of Hours']],
+    individual_time: [['start_date','Start Date'], ['end_date','End Date'], ['project','Project'], ['milestone','Milestone'], ['task','Task'], ['description','Description'], ['billable','Billable / Non-Billable'], ['hours','Number of Hours'], ['notes','Notes']],
     leave: [['employee','Employee Name'], ['leave_reason','Leave Reason'], ['leave_start_date','Leave Start Date'], ['leave_end_date','Leave End Date'], ['leave_days','Leave Days']],
     overtime: [['employee','Employee Name'], ['start_date','Start Date'], ['end_date','End Date'], ['hours_worked','Hours Worked'], ['overtime_hours','Overtime Hours']],
     holiday: [['start_date','Start Date'], ['end_date','End Date'], ['holiday_name','Holiday Name']],
@@ -319,8 +319,16 @@ export default function TimesheetCalendarPage() {
   }
   // Each field owns one dropdown: value is either its own key (included) or
   // "none" (excluded). A field can never be reassigned to a different field.
+  // 4 new optional columns for Individual Time Report default to OFF
+  const INDIVIDUAL_TIME_OPTIONAL = new Set(['milestone', 'task', 'description', 'notes'])
   const [reportFieldsOn, setReportFieldsOn] = useState(() =>
-    Object.fromEntries(Object.entries(REPORT_FIELDS).map(([k, fields]) => [k, Object.fromEntries(fields.map(([fk]) => [fk, true]))]))
+    Object.fromEntries(Object.entries(REPORT_FIELDS).map(([k, fields]) => [
+      k,
+      Object.fromEntries(fields.map(([fk]) => [
+        fk,
+        k === 'individual_time' && INDIVIDUAL_TIME_OPTIONAL.has(fk) ? false : true
+      ]))
+    ]))
   )
   const toggleReportField = (fieldsKey, fieldKey, value) => {
     setReportFieldsOn(prev => ({ ...prev, [fieldsKey]: { ...prev[fieldsKey], [fieldKey]: value !== 'none' } }))
