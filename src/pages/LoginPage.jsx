@@ -413,130 +413,179 @@ function SplashScreen({ userName, userRole }) {
   )
 }
 
-/* ─── 3D Neuron Logo — mouse-tracked tilt with floating sparks ───────────── */
-function NeuronLogo3D({ panelRef }) {
-  const current = useRef({ x: 0, y: 0 })
-  const target  = useRef({ x: 0, y: 0 })
-  const rafRef  = useRef(null)
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+/* ─── Neuron Network Canvas — 28 nodes, spring-physics mouse attraction ───── */
+function NeuronCanvas({ panelRef }) {
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    const onMove = (e) => {
-      const el = panelRef?.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      // Normalise cursor position -1…+1 relative to panel centre
-      const nx = ((e.clientX - r.left)  / r.width  - 0.5) * 2
-      const ny = ((e.clientY - r.top)   / r.height - 0.5) * 2
-      target.current = { x: -ny * 13, y: nx * 13 }   // max ±13 deg
-    }
+    const canvas = canvasRef.current
+    const panel  = panelRef?.current
+    if (!canvas || !panel) return
 
-    const loop = () => {
-      const k = 0.065   // spring stiffness — lower = slower/smoother
-      current.current.x += (target.current.x - current.current.x) * k
-      current.current.y += (target.current.y - current.current.y) * k
-      setTilt({ x: current.current.x, y: current.current.y })
-      rafRef.current = requestAnimationFrame(loop)
-    }
+    const ctx = canvas.getContext('2d')
+    let W = 0, H = 0
 
+    const resize = () => {
+      const r = panel.getBoundingClientRect()
+      W = canvas.width  = Math.round(r.width)
+      H = canvas.height = Math.round(r.height)
+    }
+    resize()
+
+    // Mouse coords relative to the panel
+    const mouse = { x: W / 2, y: H / 2 }
+    const onMove = e => {
+      const r = panel.getBoundingClientRect()
+      mouse.x = e.clientX - r.left
+      mouse.y = e.clientY - r.top
+    }
     window.addEventListener('mousemove', onMove, { passive: true })
-    rafRef.current = requestAnimationFrame(loop)
+
+    // Node colours — AXON brand palette
+    const NODE_COLORS = ['#1d6ec6','#2a7fd4','#3a8fe0','#4db8ff','#e85d1a','#ff9944']
+    const GLOW_COLORS = ['#1d6ec6','#1d6ec6','#2a7fd4','#e85d1a']
+
+    class Node {
+      constructor() {
+        this.x     = Math.random() * W
+        this.y     = Math.random() * H
+        this.vx    = (Math.random() - 0.5) * 0.3
+        this.vy    = (Math.random() - 0.5) * 0.3
+        this.r     = 2.5 + Math.random() * 3.5
+        this.color = NODE_COLORS[Math.floor(Math.random() * NODE_COLORS.length)]
+        this.glow  = GLOW_COLORS[Math.floor(Math.random() * GLOW_COLORS.length)]
+        this.phase = Math.random() * Math.PI * 2
+        this.driftX = (Math.random() - 0.5) * 0.04
+        this.driftY = (Math.random() - 0.5) * 0.04
+        this.weight = this.r / 6
+      }
+
+      update() {
+        this.phase += 0.018
+        const dx = mouse.x - this.x
+        const dy = mouse.y - this.y
+        const d  = Math.sqrt(dx * dx + dy * dy) || 1
+        const f  = Math.min(0.011 * this.weight, 0.028)
+        this.vx += (dx / d) * f + this.driftX
+        this.vy += (dy / d) * f + this.driftY
+        this.vx *= 0.974
+        this.vy *= 0.974
+        const sp = Math.sqrt(this.vx * this.vx + this.vy * this.vy)
+        if (sp > 0.85) { this.vx = (this.vx / sp) * 0.85; this.vy = (this.vy / sp) * 0.85 }
+        this.x += this.vx
+        this.y += this.vy
+        // soft wall bounce
+        if (this.x < 18)     this.vx += 0.09
+        if (this.x > W - 18) this.vx -= 0.09
+        if (this.y < 18)     this.vy += 0.09
+        if (this.y > H - 18) this.vy -= 0.09
+      }
+
+      draw() {
+        const pulse = 0.65 + 0.35 * Math.sin(this.phase)
+        // outer glow
+        const gr = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 5 * pulse)
+        gr.addColorStop(0, this.glow + '44')
+        gr.addColorStop(1, this.glow + '00')
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 5 * pulse, 0, Math.PI * 2)
+        ctx.fillStyle = gr; ctx.fill()
+        // core
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2)
+        ctx.fillStyle = this.color; ctx.fill()
+        // white highlight
+        ctx.beginPath(); ctx.arc(this.x - this.r * 0.28, this.y - this.r * 0.28, this.r * 0.32, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(255,255,255,0.52)'; ctx.fill()
+      }
+    }
+
+    const nodes = Array.from({ length: 28 }, () => new Node())
+
+    let rafId
+    const loop = () => {
+      ctx.clearRect(0, 0, W, H)
+      // Draw synapse connections
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x
+          const dy = nodes[i].y - nodes[j].y
+          const d  = Math.sqrt(dx * dx + dy * dy)
+          if (d < 165) {
+            const a   = (1 - d / 165) * 0.20
+            const hex = Math.round(a * 255).toString(16).padStart(2, '0')
+            const lg  = ctx.createLinearGradient(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y)
+            lg.addColorStop(0, nodes[i].color + hex)
+            lg.addColorStop(1, nodes[j].color + hex)
+            ctx.beginPath()
+            ctx.moveTo(nodes[i].x, nodes[i].y)
+            ctx.lineTo(nodes[j].x, nodes[j].y)
+            ctx.strokeStyle = lg; ctx.lineWidth = 0.9; ctx.stroke()
+          }
+        }
+      }
+      nodes.forEach(n => { n.update(); n.draw() })
+      rafId = requestAnimationFrame(loop)
+    }
+    loop()
+
+    const ro = new ResizeObserver(resize)
+    ro.observe(panel)
+
     return () => {
       window.removeEventListener('mousemove', onMove)
-      cancelAnimationFrame(rafRef.current)
+      cancelAnimationFrame(rafId)
+      ro.disconnect()
     }
   }, [panelRef])
 
-  // Floating spark definitions — angle, orbit radius, size, colour, animation delay
-  const SPARKS = [
-    { a:  25, rx: 190, ry: 80,  s: 5, c: '#ff8c42', d: 0.0,  anim: 0 },
-    { a: 110, rx: 175, ry: 70,  s: 3, c: '#ffd166', d: 0.55, anim: 1 },
-    { a: 190, rx: 200, ry: 85,  s: 4, c: '#ff6b35', d: 1.1,  anim: 2 },
-    { a: 285, rx: 180, ry: 75,  s: 3, c: '#ffa552', d: 1.6,  anim: 0 },
-    { a:  65, rx: 165, ry: 65,  s: 2, c: '#4db8ff', d: 0.8,  anim: 1 },
-    { a: 155, rx: 185, ry: 78,  s: 2, c: '#66c7ff', d: 1.3,  anim: 2 },
-    { a: 235, rx: 195, ry: 82,  s: 3, c: '#ff9d54', d: 0.3,  anim: 0 },
-    { a: 320, rx: 170, ry: 68,  s: 2, c: '#ffcc44', d: 1.8,  anim: 1 },
-  ]
-
-  // Parallax multiplier — sparks shift more than the logo (depth illusion)
-  const PAR = 3.2
-
   return (
-    <div style={{ position: 'relative', width: 440, height: 220 }}>
-
-      {/* 3-D tilting logo wrapper */}
-      <div style={{
-        transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-        transformStyle: 'preserve-3d',
-        willChange: 'transform',
-        position: 'relative',
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        pointerEvents: 'none',
         zIndex: 2,
+      }}
+    />
+  )
+}
+
+/* ─── 3D floating AXON logo ──────────────────────────────────────────────── */
+function AxonLogo3D() {
+  return (
+    <>
+      <div style={{
+        animation: 'logo3dFloat 8s ease-in-out infinite',
+        willChange: 'transform',
+        transformStyle: 'preserve-3d',
       }}>
-        {/* Diffuse glow layer behind the logo */}
-        <div style={{
-          position: 'absolute', inset: -28,
-          background: 'radial-gradient(ellipse 70% 55% at 50% 52%, rgba(29,110,198,0.28) 0%, transparent 70%)',
-          filter: 'blur(22px)',
-          borderRadius: '50%',
-          pointerEvents: 'none',
-        }} />
         <img
           src={axonLogo}
           alt="Axon — Requirement &amp; Tracking System"
-          style={{ width: 440, objectFit: 'contain', display: 'block', position: 'relative', zIndex: 1 }}
           draggable={false}
+          style={{
+            width: 440,
+            objectFit: 'contain',
+            display: 'block',
+            filter: [
+              'drop-shadow(2px 5px 0px rgba(0,6,24,0.75))',
+              'drop-shadow(5px 10px 0px rgba(0,6,24,0.45))',
+              'drop-shadow(8px 16px 0px rgba(0,6,24,0.22))',
+              'drop-shadow(0px 0px 48px rgba(29,110,198,0.45))',
+              'drop-shadow(0px 0px 90px rgba(232,93,26,0.18))',
+            ].join(' '),
+          }}
         />
       </div>
-
-      {/* Floating sparks — parallax depth relative to logo tilt */}
-      {SPARKS.map((sp, i) => {
-        const rad = (sp.a * Math.PI) / 180
-        const cx  = 220 + Math.cos(rad) * sp.rx    // base orbit position
-        const cy  = 110 + Math.sin(rad) * sp.ry
-        // Shift sparks in opposite direction to tilt for parallax
-        const px  = cx + tilt.y * PAR
-        const py  = cy - tilt.x * PAR
-        return (
-          <div key={i} style={{
-            position: 'absolute',
-            left: px, top: py,
-            width:  sp.s * 2.2,
-            height: sp.s * 2.2,
-            borderRadius: '50%',
-            background: sp.c,
-            boxShadow: `0 0 ${sp.s * 3}px ${sp.s}px ${sp.c}88`,
-            animation: `nSpark${sp.anim} ${2.6 + i * 0.35}s ease-in-out ${sp.d}s infinite`,
-            transform: 'translate(-50%, -50%)',
-            zIndex: 3,
-            pointerEvents: 'none',
-          }} />
-        )
-      })}
-
-      {/* Cursor-tracking edge glow ring */}
-      <div style={{
-        position: 'absolute',
-        left: '50%', top: '50%',
-        width: 460, height: 230,
-        transform: `translate(-50%,-50%) perspective(900px) rotateX(${tilt.x * 0.5}deg) rotateY(${tilt.y * 0.5}deg)`,
-        border: '1px solid rgba(29,110,198,0.18)',
-        borderRadius: '50%',
-        boxShadow: `${tilt.y * 1.2}px ${-tilt.x * 1.2}px 32px rgba(29,110,198,0.22), inset 0 0 24px rgba(232,93,26,0.06)`,
-        pointerEvents: 'none',
-        zIndex: 1,
-        transition: 'box-shadow 0.1s linear',
-      }} />
-
       <style>{`
-        @keyframes nSpark0{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.75}
-          50%{transform:translate(-50%,-62%) scale(1.4);opacity:1}}
-        @keyframes nSpark1{0%,100%{transform:translate(-50%,-50%) scale(0.8);opacity:0.55}
-          50%{transform:translate(-38%,-50%) scale(1.3);opacity:0.95}}
-        @keyframes nSpark2{0%,100%{transform:translate(-50%,-50%) scale(1.05);opacity:0.65}
-          50%{transform:translate(-50%,-40%) scale(0.85);opacity:1}}
+        @keyframes logo3dFloat {
+          0%,100% { transform: perspective(900px) rotateX(5deg) rotateY(-4deg) translateY(0px); }
+          28%     { transform: perspective(900px) rotateX(3deg) rotateY(4deg)  translateY(-7px); }
+          56%     { transform: perspective(900px) rotateX(6deg) rotateY(1deg)  translateY(-11px); }
+          78%     { transform: perspective(900px) rotateX(4deg) rotateY(-5deg) translateY(-5px); }
+        }
       `}</style>
-    </div>
+    </>
   )
 }
 
@@ -584,6 +633,9 @@ export default function LoginPage() {
              className="hidden lg:flex flex-col justify-between w-[56%] relative overflow-hidden p-10"
              style={{background:'linear-gradient(160deg,#091525 0%,#0c1e3a 45%,#0f2448 100%)'}}>
 
+          {/* ── Neuron network — floating in background ── */}
+          <NeuronCanvas panelRef={leftPanelRef} />
+
           {/* Circuit-grid background decoration */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:0.05}}>
             {[12,24,36,48,60,72,84].map((y,i)=>
@@ -611,9 +663,9 @@ export default function LoginPage() {
             <NeuralSignalPath />
           </div>
 
-          {/* ── Centre: Axon product logo — 3D mouse-tracked neuron ── */}
+          {/* ── Centre: Axon product logo — 3D floating ── */}
           <div className="relative z-10 flex flex-col items-start">
-            <NeuronLogo3D panelRef={leftPanelRef} />
+            <AxonLogo3D />
             <p style={{color:'#4a6080',fontSize:13,lineHeight:1.75,maxWidth:400,margin:'16px 0 0'}}>
               Manage milestones, assignments, and project timelines in one intelligent workspace — built for cross-functional teams.
             </p>
