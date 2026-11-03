@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAppStore } from '../store'
 import api from '../utils/api'
@@ -413,6 +413,133 @@ function SplashScreen({ userName, userRole }) {
   )
 }
 
+/* ─── 3D Neuron Logo — mouse-tracked tilt with floating sparks ───────────── */
+function NeuronLogo3D({ panelRef }) {
+  const current = useRef({ x: 0, y: 0 })
+  const target  = useRef({ x: 0, y: 0 })
+  const rafRef  = useRef(null)
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const el = panelRef?.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      // Normalise cursor position -1…+1 relative to panel centre
+      const nx = ((e.clientX - r.left)  / r.width  - 0.5) * 2
+      const ny = ((e.clientY - r.top)   / r.height - 0.5) * 2
+      target.current = { x: -ny * 13, y: nx * 13 }   // max ±13 deg
+    }
+
+    const loop = () => {
+      const k = 0.065   // spring stiffness — lower = slower/smoother
+      current.current.x += (target.current.x - current.current.x) * k
+      current.current.y += (target.current.y - current.current.y) * k
+      setTilt({ x: current.current.x, y: current.current.y })
+      rafRef.current = requestAnimationFrame(loop)
+    }
+
+    window.addEventListener('mousemove', onMove, { passive: true })
+    rafRef.current = requestAnimationFrame(loop)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [panelRef])
+
+  // Floating spark definitions — angle, orbit radius, size, colour, animation delay
+  const SPARKS = [
+    { a:  25, rx: 190, ry: 80,  s: 5, c: '#ff8c42', d: 0.0,  anim: 0 },
+    { a: 110, rx: 175, ry: 70,  s: 3, c: '#ffd166', d: 0.55, anim: 1 },
+    { a: 190, rx: 200, ry: 85,  s: 4, c: '#ff6b35', d: 1.1,  anim: 2 },
+    { a: 285, rx: 180, ry: 75,  s: 3, c: '#ffa552', d: 1.6,  anim: 0 },
+    { a:  65, rx: 165, ry: 65,  s: 2, c: '#4db8ff', d: 0.8,  anim: 1 },
+    { a: 155, rx: 185, ry: 78,  s: 2, c: '#66c7ff', d: 1.3,  anim: 2 },
+    { a: 235, rx: 195, ry: 82,  s: 3, c: '#ff9d54', d: 0.3,  anim: 0 },
+    { a: 320, rx: 170, ry: 68,  s: 2, c: '#ffcc44', d: 1.8,  anim: 1 },
+  ]
+
+  // Parallax multiplier — sparks shift more than the logo (depth illusion)
+  const PAR = 3.2
+
+  return (
+    <div style={{ position: 'relative', width: 440, height: 220 }}>
+
+      {/* 3-D tilting logo wrapper */}
+      <div style={{
+        transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transformStyle: 'preserve-3d',
+        willChange: 'transform',
+        position: 'relative',
+        zIndex: 2,
+      }}>
+        {/* Diffuse glow layer behind the logo */}
+        <div style={{
+          position: 'absolute', inset: -28,
+          background: 'radial-gradient(ellipse 70% 55% at 50% 52%, rgba(29,110,198,0.28) 0%, transparent 70%)',
+          filter: 'blur(22px)',
+          borderRadius: '50%',
+          pointerEvents: 'none',
+        }} />
+        <img
+          src={axonLogo}
+          alt="Axon — Requirement &amp; Tracking System"
+          style={{ width: 440, objectFit: 'contain', display: 'block', position: 'relative', zIndex: 1 }}
+          draggable={false}
+        />
+      </div>
+
+      {/* Floating sparks — parallax depth relative to logo tilt */}
+      {SPARKS.map((sp, i) => {
+        const rad = (sp.a * Math.PI) / 180
+        const cx  = 220 + Math.cos(rad) * sp.rx    // base orbit position
+        const cy  = 110 + Math.sin(rad) * sp.ry
+        // Shift sparks in opposite direction to tilt for parallax
+        const px  = cx + tilt.y * PAR
+        const py  = cy - tilt.x * PAR
+        return (
+          <div key={i} style={{
+            position: 'absolute',
+            left: px, top: py,
+            width:  sp.s * 2.2,
+            height: sp.s * 2.2,
+            borderRadius: '50%',
+            background: sp.c,
+            boxShadow: `0 0 ${sp.s * 3}px ${sp.s}px ${sp.c}88`,
+            animation: `nSpark${sp.anim} ${2.6 + i * 0.35}s ease-in-out ${sp.d}s infinite`,
+            transform: 'translate(-50%, -50%)',
+            zIndex: 3,
+            pointerEvents: 'none',
+          }} />
+        )
+      })}
+
+      {/* Cursor-tracking edge glow ring */}
+      <div style={{
+        position: 'absolute',
+        left: '50%', top: '50%',
+        width: 460, height: 230,
+        transform: `translate(-50%,-50%) perspective(900px) rotateX(${tilt.x * 0.5}deg) rotateY(${tilt.y * 0.5}deg)`,
+        border: '1px solid rgba(29,110,198,0.18)',
+        borderRadius: '50%',
+        boxShadow: `${tilt.y * 1.2}px ${-tilt.x * 1.2}px 32px rgba(29,110,198,0.22), inset 0 0 24px rgba(232,93,26,0.06)`,
+        pointerEvents: 'none',
+        zIndex: 1,
+        transition: 'box-shadow 0.1s linear',
+      }} />
+
+      <style>{`
+        @keyframes nSpark0{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.75}
+          50%{transform:translate(-50%,-62%) scale(1.4);opacity:1}}
+        @keyframes nSpark1{0%,100%{transform:translate(-50%,-50%) scale(0.8);opacity:0.55}
+          50%{transform:translate(-38%,-50%) scale(1.3);opacity:0.95}}
+        @keyframes nSpark2{0%,100%{transform:translate(-50%,-50%) scale(1.05);opacity:0.65}
+          50%{transform:translate(-50%,-40%) scale(0.85);opacity:1}}
+      `}</style>
+    </div>
+  )
+}
+
 /* ─── Login Page ─────────────────────────────────────────────────────────── */
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -423,6 +550,7 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [splashUser, setSplashUser] = useState(null)
   const [splashRole, setSplashRole] = useState(null)
+  const leftPanelRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -452,7 +580,8 @@ export default function LoginPage() {
       <div className="min-h-screen flex" style={{background:'#eef2f7'}}>
 
         {/* ════════════════ LEFT PANEL — Branding ════════════════ */}
-        <div className="hidden lg:flex flex-col justify-between w-[56%] relative overflow-hidden p-10"
+        <div ref={leftPanelRef}
+             className="hidden lg:flex flex-col justify-between w-[56%] relative overflow-hidden p-10"
              style={{background:'linear-gradient(160deg,#091525 0%,#0c1e3a 45%,#0f2448 100%)'}}>
 
           {/* Circuit-grid background decoration */}
@@ -482,9 +611,9 @@ export default function LoginPage() {
             <NeuralSignalPath />
           </div>
 
-          {/* ── Centre: Axon product logo ── */}
+          {/* ── Centre: Axon product logo — 3D mouse-tracked neuron ── */}
           <div className="relative z-10 flex flex-col items-start">
-            <img src={axonLogo} alt="Axon — Requirement &amp; Tracking System" style={{width:440,objectFit:"contain"}}/>
+            <NeuronLogo3D panelRef={leftPanelRef} />
             <p style={{color:'#4a6080',fontSize:13,lineHeight:1.75,maxWidth:400,margin:'16px 0 0'}}>
               Manage milestones, assignments, and project timelines in one intelligent workspace — built for cross-functional teams.
             </p>
