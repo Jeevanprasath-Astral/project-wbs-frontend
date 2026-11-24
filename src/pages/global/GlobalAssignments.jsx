@@ -39,7 +39,7 @@ export default function GlobalAssignments() {
   // Backend only allows Admin/FC Lead/TC Lead/Functional Consultant to
   // create assignments — keep the "Assign task" entry point in sync so
   // ineligible roles don't fill out the whole form only to get a 403 toast.
-  const canAssign = isElevated(user) || user?.role === 'Associate' || user?.role === 'Functional Consultant' || user?.role === 'Technical Team'
+  const canAssign = isElevated(user) || user?.role === 'BD' || user?.role === 'Associate' || user?.role === 'Functional Consultant' || user?.role === 'Technical Team'
   const [assignments, setAssignments] = useState([])
   const [projects, setProjects] = useState([])
   const [users, setUsers] = useState([])
@@ -240,7 +240,7 @@ export default function GlobalAssignments() {
   }
   const closeDetail = () => { setDetailTask(null); setDetailEdit(false) }
 
-  const canEditDetail = (a) => a && (isElevated(user) || a.assigned_by === user?.id)
+  const canEditDetail = (a) => a && (isElevated(user) || user?.role === 'BD' || a.assigned_by === user?.id)
 
   const handleDetailSave = async () => {
     if (!detailTask) return

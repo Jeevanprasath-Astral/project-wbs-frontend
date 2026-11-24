@@ -159,10 +159,10 @@ export default function AssignmentsPage() {
   // whole form and only find out it was rejected from a toast that
   // auto-dismisses in a few seconds, which read as "nothing happened."
   // Hiding the entry point for ineligible roles fixes that at the source.
-  const canAssign = isElevated(user) || user?.role === 'Associate' || user?.role === 'Functional Consultant' || user?.role === 'Technical Team'
-  // Backend's delete_assignment only allows Admin/FC Lead/TC Lead (not plain
-  // Functional Consultant) — keep the Delete button's visibility in sync.
-  const canDelete = isElevated(user)
+  const canAssign = isElevated(user) || user?.role === 'BD' || user?.role === 'Associate' || user?.role === 'Functional Consultant' || user?.role === 'Technical Team'
+  // Backend's delete_assignment allows Admin/FC Lead/TC Lead and BD —
+  // keep the Delete button's visibility in sync.
+  const canDelete = isElevated(user) || user?.role === 'BD'
   const [assignments, setAssignments] = useState([])
   const [team, setTeam] = useState([])
   const [customMilestones, setCustomMilestones] = useState([])
